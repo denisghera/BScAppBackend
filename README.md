@@ -11,7 +11,7 @@ A simple backend service for user registration, login, and email verification bu
 ## Setup
 
 1. Clone the repo:
-   `git clone https://github.com/your-username/BScAppBackend.git`
+   `git clone https://github.com/denisghera/BScAppBackend.git`
    
 2. Set up a virtual environment:
    - `python -m venv venv`
