@@ -23,7 +23,7 @@ async def send_verification_email(email: str, token: str):
     message = MessageSchema(
         subject="Verify Your Email",
         recipients=[email],
-        body=f"Click the link to verify your email: {verification_link}",
+        body=f"Click the link to verify your email: \n\n{verification_link}",
         subtype="plain"
     )
 

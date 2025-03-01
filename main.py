@@ -34,8 +34,9 @@ async def register_user(email: EmailStr = Form(...), username: str = Form(...), 
         "token": token
     }
     collection.insert_one(user)
-
-    await send_verification_email(email, token)
+    
+    if not testing:
+        await send_verification_email(email, token)
 
     return {"message": "User registered successfully! Please check your email to verify your account."}
     
