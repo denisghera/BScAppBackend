@@ -11,6 +11,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client["test_db"]
 users_collection: Collection = db["users"]
+daily_puzzle_collection: Collection = db["daily_puzzles"]
 test_collection: Collection = db["test_collection"]
 
 # Email Configuration

@@ -1,13 +1,17 @@
 from fastapi import FastAPI, Form, HTTPException
 from pydantic import EmailStr
 from email_validator import validate_email, EmailNotValidError
-from config import users_collection, test_collection
+from config import users_collection, test_collection, daily_puzzle_collection
 from utils import *
+from datetime import datetime
 
 app = FastAPI()
 
 def get_user_collection(testing: bool):
     return test_collection if testing else users_collection
+
+def get_daily_puzzle_collection(testing: bool):
+    return test_collection if testing else daily_puzzle_collection
 
 @app.post("/register")
 async def register_user(email: EmailStr = Form(...), username: str = Form(...), password: str = Form(...), testing: bool = False):
@@ -67,6 +71,21 @@ def verify_email(token: str, testing: bool = False):
     collection.update_one({"token": token}, {"$set": {"verified": True}, "$unset": {"token": ""}})
 
     return {"message": "Email verified successfully! You can now log in."}
+
+@app.get("/dailypuzzle/{date}")
+def get_daily_puzzle(date: str, testing: bool = False):
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    
+    collection = get_daily_puzzle_collection(testing)
+    puzzle = collection.find_one({"date": date})
+    
+    if not puzzle:
+        raise HTTPException(status_code=404, detail="No puzzle available")
+
+    return {"message": {"name" : puzzle["name"], "description" : puzzle["description"], "tests" : puzzle["tests"]}}
 
 @app.get("/")
 def home():

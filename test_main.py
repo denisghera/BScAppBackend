@@ -1,7 +1,7 @@
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from main import app, register_user, login_user, verify_email
+from main import app, register_user, login_user, verify_email, get_daily_puzzle
 from config import test_collection
 from utils import hash_password
 
@@ -85,3 +85,35 @@ def test_valid_token():
     assert response["message"] == "Email verified successfully! You can now log in."
     assert user["verified"] == True
     assert "token" not in user
+
+def test_get_daily_puzzle_valid_date():
+    test_collection.insert_one({
+        "date": "2024-03-05",
+        "name": "Test Puzzle",
+        "description": "Solve this challenge",
+        "tests": ["add(2,5) == 7", "add(150,325) == 475"]
+    })
+
+    response = get_daily_puzzle("2024-03-05", testing=True)
+    
+    assert response == {
+        "message": {
+            "name": "Test Puzzle",
+            "description": "Solve this challenge",
+            "tests": ["add(2,5) == 7", "add(150,325) == 475"]
+        }
+    }
+
+def test_get_daily_puzzle_invalid_date_format():
+    with pytest.raises(HTTPException) as excinfo:
+        get_daily_puzzle("05-03-2024", testing=True)
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "Invalid date format. Use YYYY-MM-DD."
+
+def test_get_daily_puzzle_not_found():
+    with pytest.raises(HTTPException) as excinfo:
+        get_daily_puzzle("2024-03-06", testing=True)
+
+    assert excinfo.value.status_code == 404
+    assert excinfo.value.detail == "No puzzle available"
