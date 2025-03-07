@@ -34,14 +34,14 @@ async def register_user(user: UserRegister, testing: bool = False):
 
     token = generate_unique_token()
 
-    user = {
+    dbUser = {
         "email": user.email,
         "username": user.username,
         "password": hashed_password,
         "verified": False,
         "token": token
     }
-    collection.insert_one(user)
+    collection.insert_one(dbUser)
     
     if not testing:
         await send_verification_email(user.email, token)
