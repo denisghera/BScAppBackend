@@ -12,6 +12,7 @@ client = MongoClient(MONGO_URI)
 db = client["test_db"]
 users_collection: Collection = db["users"]
 daily_puzzle_collection: Collection = db["daily_puzzles"]
+user_file_collection: Collection = db["user_files"]
 test_collection: Collection = db["test_collection"]
 
 # Email Configuration

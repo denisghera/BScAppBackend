@@ -1,69 +1,120 @@
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from main import app, register_user, login_user, verify_email, get_daily_puzzle
+from main import app, register_user, login_user, verify_email, get_daily_puzzle, get_user_files, upload_user_files
 from config import test_collection
 from utils import hash_password
+from models import UserRegister, UserLogin, UserFileList, UserFile
+from pydantic import ValidationError
 
 client = TestClient(app)
 
 @pytest.fixture(scope="function", autouse=True)
 def clean_db():
-    test_collection.delete_many({})
+    test_collection.delete_many({})  # Clear the database before and after each test
     yield
     test_collection.delete_many({})
 
 @pytest.mark.asyncio
 async def test_register_user():
-    response = await register_user(email="testuser@gmail.com", username="testuser", password="strongpassword", testing=True)
+    user_data = UserRegister(
+        email="testuser@gmail.com",
+        username="testuser",
+        password="strongpassword"
+    )
+
+    response = await register_user(user=user_data, testing=True)
     
     assert response["message"] == "User registered successfully! Please check your email to verify your account."
 
 @pytest.mark.asyncio
 async def test_register_duplicate_user():
-    test_collection.insert_one({"username": "testuser", "email": "test@example.com", "password": hash_password("password")})
+    test_collection.insert_one({
+        "username": "testuser", 
+        "email": "test@example.com", 
+        "password": hash_password("password")
+    })
     
+    user_data = UserRegister(
+        email="test2@gmail.com", 
+        username="testuser", 
+        password="anotherpassword"
+    )
+
     with pytest.raises(HTTPException) as excinfo:
-        await register_user(email="test2@gmail.com", username="testuser", password="anotherpassword", testing=True)
+        await register_user(user=user_data, testing=True)
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "Username already taken"
 
 @pytest.mark.asyncio
 async def test_register_invalid_email():
-    with pytest.raises(HTTPException) as excinfo:
-        await register_user(email="not-an-email", username="newuser", password="password123", testing=True)
-
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == "Invalid email format"
+    with pytest.raises(ValidationError):
+        UserRegister(
+            email="not-an-email",
+            username="newuser",
+            password="password123"
+        )
 
 def test_login_invalid_password():
-    test_collection.insert_one({"username": "testuser", "password": hash_password("correctpassword"), "verified": True})
+    test_collection.insert_one({
+        "username": "testuser", 
+        "password": hash_password("correctpassword"), 
+        "verified": True
+    })
+
+    user_data = UserLogin(
+        username="testuser",
+        password="wrongpassword"
+    )
 
     with pytest.raises(HTTPException) as excinfo:
-        login_user(username="testuser", password="wrongpassword", testing=True)
+        login_user(user=user_data, testing=True)
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "Invalid username or password"
 
 def test_login_unverified_email():
-    test_collection.insert_one({"username": "unverified_user", "password": hash_password("password"), "verified": False})
+    test_collection.insert_one({
+        "username": "unverified_user", 
+        "password": hash_password("password"),
+        "verified": False
+    })
+
+    user_data = UserLogin(
+        username="unverified_user", 
+        password="password"
+    )
 
     with pytest.raises(HTTPException) as excinfo:
-        login_user(username="unverified_user", password="password", testing=True)
+        login_user(user=user_data, testing=True)
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "Email not verified. Please check your inbox."
 
 def test_login_success():
-    test_collection.insert_one({"username": "testuser", "password": hash_password("mypassword"), "verified": True})
+    test_collection.insert_one({
+        "username": "testuser", 
+        "password": hash_password("mypassword"), 
+        "verified": True
+    })
 
-    response = login_user(username="testuser", password="mypassword", testing=True)
+    user_data = UserLogin(
+        username="testuser", 
+        password="mypassword"
+    )
+
+    response = login_user(user=user_data, testing=True)
 
     assert response["message"] == "Login successful!"
 
 def test_invalid_token():
-    test_collection.insert_one({"username": "testuser", "password": hash_password("mypassword"), "verified": False, "token": "token"})
+    test_collection.insert_one({
+        "username": "testuser", 
+        "password": hash_password("mypassword"),
+        "verified": False, 
+        "token": "token"
+    })
 
     with pytest.raises(HTTPException) as excinfo:
         verify_email("invalidtoken", testing=True)
@@ -76,7 +127,12 @@ def test_invalid_token():
     assert "token" in user
 
 def test_valid_token():
-    test_collection.insert_one({"username": "testuser", "password": hash_password("mypassword"), "verified": False, "token": "token"})
+    test_collection.insert_one({
+        "username": "testuser", 
+        "password": hash_password("mypassword"),
+        "verified": False, 
+        "token": "token"
+    })
 
     response = verify_email("token", testing=True)
 
@@ -97,11 +153,9 @@ def test_get_daily_puzzle_valid_date():
     response = get_daily_puzzle("2024-03-05", testing=True)
     
     assert response == {
-        "message": {
-            "name": "Test Puzzle",
-            "description": "Solve this challenge",
-            "tests": ["add(2,5) == 7", "add(150,325) == 475"]
-        }
+        "name": "Test Puzzle",
+        "description": "Solve this challenge",
+        "tests": ["add(2,5) == 7", "add(150,325) == 475"]
     }
 
 def test_get_daily_puzzle_invalid_date_format():
@@ -117,3 +171,45 @@ def test_get_daily_puzzle_not_found():
 
     assert excinfo.value.status_code == 404
     assert excinfo.value.detail == "No puzzle available"
+
+def test_get_user_files_success():
+    test_collection.insert_one({
+        "owner": "testuser",
+        "content": "def add(x, y):\nreturn x + y",
+        "name": "file1",
+        "purpose": "daily puzzle"
+    })
+    test_collection.insert_one({
+        "owner": "testuser",
+        "content": "x = 123",
+        "name": "file2",
+        "purpose": "playground"
+    })
+
+    response = get_user_files("testuser", testing=True)["files"]
+
+    assert len(response) == 2
+    assert all("owner" not in file for file in response)
+    assert all("_id" not in file for file in response)
+    assert response[0]["name"] == "file1"
+    assert response[1]["purpose"] == "playground"
+
+def test_get_user_files_empty():
+    response = get_user_files("nonexistentuser", testing=True)["files"]
+
+    assert len(response) == 0
+
+@pytest.mark.asyncio
+async def test_upload_user_files():
+    file_data = UserFileList(
+        files=[
+            UserFile(owner="testuser", content="def add(x, y):\n    return x + y", name="file1", purpose="daily puzzle"),
+            UserFile(owner="testuser", content="x = 123", name="file2", purpose="playground")
+        ]
+    )
+
+    response = await upload_user_files(fileList=file_data, testing=True)
+
+    assert response["message"] == "Successfully inserted 2 files."
+    
+    assert test_collection.count_documents({"owner": "testuser"}) == 2
