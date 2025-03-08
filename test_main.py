@@ -23,9 +23,10 @@ async def test_register_user():
         password="strongpassword"
     )
 
-    response = await register_user(user=user_data, testing=True)
-    
-    assert response["message"] == "User registered successfully! Please check your email to verify your account."
+    response = client.post("/register", json=user_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "User registered successfully! Please check your email to verify your account."
 
 @pytest.mark.asyncio
 async def test_register_duplicate_user():
@@ -41,20 +42,22 @@ async def test_register_duplicate_user():
         password="anotherpassword"
     )
 
-    with pytest.raises(HTTPException) as excinfo:
-        await register_user(user=user_data, testing=True)
+    response = client.post("/register", json=user_data.model_dump(), params={"testing": "True"})
 
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == "Username already taken"
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Username already taken"
 
-@pytest.mark.asyncio
-async def test_register_invalid_email():
-    with pytest.raises(ValidationError):
-        UserRegister(
-            email="not-an-email",
-            username="newuser",
-            password="password123"
-        )
+def test_register_invalid_email():
+    user_data = {
+        "email": "not-an-email",
+        "username": "newuser",
+        "password": "password123"
+    }
+
+    response = client.post("/register", json=user_data, params={"testing": "True"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid email format"
 
 def test_login_invalid_password():
     test_collection.insert_one({
@@ -68,11 +71,10 @@ def test_login_invalid_password():
         password="wrongpassword"
     )
 
-    with pytest.raises(HTTPException) as excinfo:
-        login_user(user=user_data, testing=True)
+    response = client.post("/login", json=user_data.model_dump(), params={"testing": "True"})
 
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == "Invalid username or password"
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid username or password"
 
 def test_login_unverified_email():
     test_collection.insert_one({
@@ -86,11 +88,10 @@ def test_login_unverified_email():
         password="password"
     )
 
-    with pytest.raises(HTTPException) as excinfo:
-        login_user(user=user_data, testing=True)
+    response = client.post("/login", json=user_data.model_dump(), params={"testing": "True"})
 
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == "Email not verified. Please check your inbox."
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Email not verified. Please check your inbox."
 
 def test_login_success():
     test_collection.insert_one({
@@ -104,9 +105,10 @@ def test_login_success():
         password="mypassword"
     )
 
-    response = login_user(user=user_data, testing=True)
+    response = client.post("/login", json=user_data.model_dump(), params={"testing": "True"})
 
-    assert response["message"] == "Login successful!"
+    assert response.status_code == 200
+    assert response.json()["message"] == "Login successful!"
 
 def test_invalid_token():
     test_collection.insert_one({
@@ -116,13 +118,12 @@ def test_invalid_token():
         "token": "token"
     })
 
-    with pytest.raises(HTTPException) as excinfo:
-        verify_email("invalidtoken", testing=True)
+    response = client.get("/verify/invalidtoken?testing=True")
 
     user = test_collection.find_one({"username": "testuser"})
     
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == "Invalid or expired token"
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid or expired token"
     assert user["verified"] == False
     assert "token" in user
 
@@ -134,11 +135,12 @@ def test_valid_token():
         "token": "token"
     })
 
-    response = verify_email("token", testing=True)
+    response = client.get("/verify/token?testing=True")
 
     user = test_collection.find_one({"username": "testuser"})
 
-    assert response["message"] == "Email verified successfully! You can now log in."
+    assert response.status_code == 200
+    assert response.json()["message"] == "Email verified successfully! You can now log in."
     assert user["verified"] == True
     assert "token" not in user
 
@@ -150,27 +152,26 @@ def test_get_daily_puzzle_valid_date():
         "tests": ["add(2,5) == 7", "add(150,325) == 475"]
     })
 
-    response = get_daily_puzzle("2024-03-05", testing=True)
-    
-    assert response == {
+    response = client.get("/dailypuzzle/2024-03-05?testing=True")
+
+    assert response.status_code == 200
+    assert response.json() == {
         "name": "Test Puzzle",
         "description": "Solve this challenge",
         "tests": ["add(2,5) == 7", "add(150,325) == 475"]
     }
 
 def test_get_daily_puzzle_invalid_date_format():
-    with pytest.raises(HTTPException) as excinfo:
-        get_daily_puzzle("05-03-2024", testing=True)
+    response = client.get("/dailypuzzle/05-03-2024?testing=True")
 
-    assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == "Invalid date format. Use YYYY-MM-DD."
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid date format. Use YYYY-MM-DD."
 
 def test_get_daily_puzzle_not_found():
-    with pytest.raises(HTTPException) as excinfo:
-        get_daily_puzzle("2024-03-06", testing=True)
+    response = client.get("/dailypuzzle/2024-03-06?testing=True")
 
-    assert excinfo.value.status_code == 404
-    assert excinfo.value.detail == "No puzzle available"
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No puzzle available"
 
 def test_get_user_files_success():
     test_collection.insert_one({
@@ -186,31 +187,32 @@ def test_get_user_files_success():
         "purpose": "playground"
     })
 
-    response = get_user_files("testuser", testing=True)["files"]
+    response = client.get("/userfiles/testuser?testing=True")
 
-    assert len(response) == 2
-    assert all("_id" not in file for file in response)
-    assert response[0]["name"] == "file1"
-    assert response[1]["purpose"] == "playground"
+    assert response.status_code == 200
+    files = response.json()["files"]
+    assert len(files) == 2
+    assert all("_id" not in file for file in files)
+    assert files[0]["name"] == "file1"
+    assert files[1]["purpose"] == "playground"
 
 def test_get_user_files_empty():
-    response = get_user_files("nonexistentuser", testing=True)["files"]
+    response = client.get("/userfiles/nonexistentuser?testing=True")
 
-    assert len(response) == 0
+    assert response.status_code == 200
+    assert len(response.json()["files"]) == 0
 
 @pytest.mark.asyncio
 async def test_upload_user_files():
     file_data = UserFileList(
-        files=[
-            UserFile(owner="testuser", content="def add(x, y):\n    return x + y", name="file1", purpose="daily puzzle"),
-            UserFile(owner="testuser", content="x = 123", name="file2", purpose="playground")
-        ]
+        files=[UserFile(owner="testuser", content="def add(x, y):\n    return x + y", name="file1", purpose="daily puzzle"),
+               UserFile(owner="testuser", content="x = 123", name="file2", purpose="playground")]
     )
 
-    response = await upload_user_files(fileList=file_data, testing=True)
+    response = client.post("/uploadfiles", json=file_data.model_dump(), params={"testing": "True"})
 
-    assert response["message"] == "Successfully updated 0 files, inserted 2 new files."
-    
+    assert response.status_code == 200
+    assert response.json()["message"] == "Successfully updated 0 files, inserted 2 new files."
     assert test_collection.count_documents({"owner": "testuser"}) == 2
 
 @pytest.mark.asyncio
@@ -223,18 +225,49 @@ async def test_upload_user_files_update():
     })
     
     updated_file_data = UserFileList(
-        files=[
-            UserFile(owner="testuser", content="new content", name="file1", purpose="purpose")
-        ]
+        files=[UserFile(owner="testuser", content="new content", name="file1", purpose="purpose")]
     )
 
-    response = await upload_user_files(fileList=updated_file_data, testing=True)
+    response = client.post("/uploadfiles", json=updated_file_data.model_dump(), params={"testing": "True"})
 
-    assert "updated 1" in response["message"]
-    assert "inserted 0" in response["message"]
+    assert response.status_code == 200
+    assert "updated 1" in response.json()["message"]
+    assert "inserted 0" in response.json()["message"]
 
     updated_file = test_collection.find_one({"owner": "testuser", "name": "file1"})
     
     assert updated_file is not None
     assert updated_file["content"] == "new content"
     assert test_collection.count_documents({"owner": "testuser", "name": "file1"}) == 1
+
+def test_get_lectures_success():
+    test_collection.insert_one({
+        "difficulty": "easy",
+        "title": "Intro to Python",
+        "slides": [{"name": "slide1", "content": "Content of slide 1"}],
+        "quiz": [{"question": "What is 2+2?", "answer": "4", "options": ["3", "4", "5", "6"]}]
+    })
+    test_collection.insert_one({
+        "difficulty": "easy",
+        "title": "Basic Data Structures",
+        "slides": [{"name": "slide1", "content": "Content of slide 1"}],
+        "quiz": [{"question": "What is a list?", "answer": "A collection", "options": ["A number", "A collection", "A string"]}]
+    })
+
+    response = client.get("/lectures/easy?testing=True")
+
+    assert response.status_code == 200
+    lectures = response.json()["lectures"]
+    print(lectures)
+    assert len(lectures) == 2
+    assert lectures[0]["title"] == "Intro to Python"
+    assert lectures[1]["title"] == "Basic Data Structures"
+    assert lectures[0]["difficulty"] == "easy"
+    assert len(lectures[0]["slides"]) == 1
+    assert len(lectures[0]["quiz"]) == 1
+
+def test_get_lectures_no_matches():
+    response = client.get("/lectures/advanced?testing=True")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No lectures found for the given difficulty."

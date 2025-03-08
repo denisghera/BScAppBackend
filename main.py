@@ -1,11 +1,10 @@
-from pydantic import ValidationError
 from fastapi import FastAPI, HTTPException
 from email_validator import validate_email, EmailNotValidError
-from config import users_collection, test_collection, daily_puzzle_collection, user_file_collection
-from models import *
-from utils import *
 from datetime import datetime
 from pymongo import UpdateOne
+from config import *
+from models import *
+from utils import *
 
 app = FastAPI()
 
@@ -18,12 +17,15 @@ def get_daily_puzzle_collection(testing: bool):
 def get_user_file_collection(testing: bool):
     return test_collection if testing else user_file_collection
 
+def get_lecture_collection(testing: bool):
+    return test_collection if testing else lecture_collection
+
 @app.post("/register")
 async def register_user(user: UserRegister, testing: bool = False):
     collection = get_user_collection(testing)
     try:
         validate_email(user.email)
-    except (EmailNotValidError, ValidationError):
+    except EmailNotValidError:
         raise HTTPException(status_code=400, detail="Invalid email format")
 
     if collection.find_one({"username": user.username}):
@@ -126,6 +128,29 @@ async def upload_user_files(fileList: UserFileList, testing: bool = False):
     return {
         "message": f"Successfully updated {result.matched_count} files, inserted {result.upserted_count} new files."
     }
+
+@app.get("/lectures/{difficulty}")
+def get_lectures(difficulty: str, testing: bool = False):
+    collection = get_lecture_collection(testing)
+    
+    count = collection.count_documents({"difficulty": difficulty})
+    
+    if count == 0:
+        raise HTTPException(status_code=404, detail="No lectures found for the given difficulty.")
+    
+    lectures_cursor = collection.find({"difficulty": difficulty})
+    
+    lectures = []
+    for lecture in lectures_cursor:
+        lecture_data = LectureData(
+            difficulty=lecture["difficulty"],
+            title=lecture["title"],
+            slides=[SlideData(name=slide["name"], content=slide["content"]) for slide in lecture["slides"]],
+            quiz=[QuizData(question=quiz["question"], answer=quiz["answer"], options=quiz["options"]) for quiz in lecture["quiz"]],
+        )
+        lectures.append(lecture_data)
+    
+    return {"lectures": lectures}
 
 
 @app.get("/")
