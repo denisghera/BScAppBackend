@@ -5,6 +5,7 @@ from config import users_collection, test_collection, daily_puzzle_collection, u
 from models import *
 from utils import *
 from datetime import datetime
+from pymongo import UpdateOne
 
 app = FastAPI()
 
@@ -97,8 +98,7 @@ def get_user_files(username: str, testing: bool = False):
     
     files_cursor = collection.find(
         {"owner": username},
-        {"owner": 0,
-         "_id": 0}
+        {"_id": 0}
     )
     
     files = list(files_cursor)
@@ -109,13 +109,24 @@ def get_user_files(username: str, testing: bool = False):
 async def upload_user_files(fileList: UserFileList, testing: bool = False):
     collection = get_user_file_collection(testing)
     
-    inserted_files = []
-    for file in fileList.files:
-        result = collection.insert_one(file.model_dump())
-        
-        inserted_files.append(str(result.inserted_id))
+    operations = []
     
-    return {"message": f"Successfully inserted {len(inserted_files)} files."}
+    for file in fileList.files:
+        operations.append(
+            UpdateOne(
+                {"owner": file.owner, "name": file.name, "purpose": file.purpose},
+                {"$set": file.model_dump()},
+                upsert=True
+            )
+        )
+    
+    if operations:
+        result = collection.bulk_write(operations)
+    
+    return {
+        "message": f"Successfully updated {result.matched_count} files, inserted {result.upserted_count} new files."
+    }
+
 
 @app.get("/")
 def home():

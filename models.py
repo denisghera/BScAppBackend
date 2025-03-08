@@ -12,8 +12,8 @@ class UserLogin(BaseModel):
 
 class UserFile(BaseModel):
     owner: str
-    content: str
     name: str
+    content: str
     purpose: str
 
 class UserFileList(BaseModel):

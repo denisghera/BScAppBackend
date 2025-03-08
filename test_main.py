@@ -189,7 +189,6 @@ def test_get_user_files_success():
     response = get_user_files("testuser", testing=True)["files"]
 
     assert len(response) == 2
-    assert all("owner" not in file for file in response)
     assert all("_id" not in file for file in response)
     assert response[0]["name"] == "file1"
     assert response[1]["purpose"] == "playground"
@@ -210,6 +209,32 @@ async def test_upload_user_files():
 
     response = await upload_user_files(fileList=file_data, testing=True)
 
-    assert response["message"] == "Successfully inserted 2 files."
+    assert response["message"] == "Successfully updated 0 files, inserted 2 new files."
     
     assert test_collection.count_documents({"owner": "testuser"}) == 2
+
+@pytest.mark.asyncio
+async def test_upload_user_files_update():
+    test_collection.insert_one({
+        "owner": "testuser",
+        "content": "old content",
+        "name": "file1",
+        "purpose": "purpose"
+    })
+    
+    updated_file_data = UserFileList(
+        files=[
+            UserFile(owner="testuser", content="new content", name="file1", purpose="purpose")
+        ]
+    )
+
+    response = await upload_user_files(fileList=updated_file_data, testing=True)
+
+    assert "updated 1" in response["message"]
+    assert "inserted 0" in response["message"]
+
+    updated_file = test_collection.find_one({"owner": "testuser", "name": "file1"})
+    
+    assert updated_file is not None
+    assert updated_file["content"] == "new content"
+    assert test_collection.count_documents({"owner": "testuser", "name": "file1"}) == 1
