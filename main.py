@@ -147,6 +147,7 @@ def get_lectures(difficulty: str, testing: bool = False):
             title=lecture["title"],
             slides=[SlideData(name=slide["name"], content=slide["content"]) for slide in lecture["slides"]],
             quiz=[QuizData(question=quiz["question"], answer=quiz["answer"], options=quiz["options"]) for quiz in lecture["quiz"]],
+            required=[r for r in lecture["required"]]
         )
         lectures.append(lecture_data)
     

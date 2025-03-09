@@ -245,13 +245,15 @@ def test_get_lectures_success():
         "difficulty": "easy",
         "title": "Intro to Python",
         "slides": [{"name": "slide1", "content": "Content of slide 1"}],
-        "quiz": [{"question": "What is 2+2?", "answer": "4", "options": ["3", "4", "5", "6"]}]
+        "quiz": [{"question": "What is 2+2?", "answer": "4", "options": ["3", "4", "5", "6"]}],
+        "required": []
     })
     test_collection.insert_one({
         "difficulty": "easy",
         "title": "Basic Data Structures",
         "slides": [{"name": "slide1", "content": "Content of slide 1"}],
-        "quiz": [{"question": "What is a list?", "answer": "A collection", "options": ["A number", "A collection", "A string"]}]
+        "quiz": [{"question": "What is a list?", "answer": "A collection", "options": ["A number", "A collection", "A string"]}],
+        "required": ["Intro to Python"]
     })
 
     response = client.get("/lectures/easy?testing=True")
@@ -265,6 +267,8 @@ def test_get_lectures_success():
     assert lectures[0]["difficulty"] == "easy"
     assert len(lectures[0]["slides"]) == 1
     assert len(lectures[0]["quiz"]) == 1
+    assert len(lectures[0]["required"]) == 0
+    assert len(lectures[1]["required"]) == 1
 
 def test_get_lectures_no_matches():
     response = client.get("/lectures/advanced?testing=True")

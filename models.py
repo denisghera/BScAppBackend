@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import List
 
 class UserRegister(BaseModel):
@@ -33,6 +33,7 @@ class LectureData(BaseModel):
     title: str
     slides: List[SlideData]
     quiz: List[QuizData]
+    required: List[str]
 
 class LectureList(BaseModel):
     lectures: List[LectureData]
