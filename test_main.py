@@ -1,11 +1,9 @@
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from main import app, register_user, login_user, verify_email, get_daily_puzzle, get_user_files, upload_user_files
+from main import app
 from config import test_collection
 from utils import hash_password
 from models import UserRegister, UserLogin, UserFileList, UserFile
-from pydantic import ValidationError
 
 client = TestClient(app)
 
@@ -152,7 +150,7 @@ def test_get_daily_puzzle_valid_date():
         "tests": ["add(2,5) == 7", "add(150,325) == 475"]
     })
 
-    response = client.get("/dailypuzzle/2024-03-05?testing=True")
+    response = client.get("/daily-puzzle/2024-03-05?testing=True")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -162,13 +160,13 @@ def test_get_daily_puzzle_valid_date():
     }
 
 def test_get_daily_puzzle_invalid_date_format():
-    response = client.get("/dailypuzzle/05-03-2024?testing=True")
+    response = client.get("/daily-puzzle/05-03-2024?testing=True")
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid date format. Use YYYY-MM-DD."
 
 def test_get_daily_puzzle_not_found():
-    response = client.get("/dailypuzzle/2024-03-06?testing=True")
+    response = client.get("/daily-puzzle/2024-03-06?testing=True")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No puzzle available"
@@ -187,7 +185,7 @@ def test_get_user_files_success():
         "purpose": "playground"
     })
 
-    response = client.get("/userfiles/testuser?testing=True")
+    response = client.get("/user-files/testuser?testing=True")
 
     assert response.status_code == 200
     files = response.json()["files"]
@@ -197,7 +195,7 @@ def test_get_user_files_success():
     assert files[1]["purpose"] == "playground"
 
 def test_get_user_files_empty():
-    response = client.get("/userfiles/nonexistentuser?testing=True")
+    response = client.get("/user-files/nonexistentuser?testing=True")
 
     assert response.status_code == 200
     assert len(response.json()["files"]) == 0
@@ -209,7 +207,7 @@ async def test_upload_user_files():
                UserFile(owner="testuser", content="x = 123", name="file2", purpose="playground")]
     )
 
-    response = client.post("/uploadfiles", json=file_data.model_dump(), params={"testing": "True"})
+    response = client.post("/upload-files", json=file_data.model_dump(), params={"testing": "True"})
 
     assert response.status_code == 200
     assert response.json()["message"] == "Successfully updated 0 files, inserted 2 new files."
@@ -228,7 +226,7 @@ async def test_upload_user_files_update():
         files=[UserFile(owner="testuser", content="new content", name="file1", purpose="purpose")]
     )
 
-    response = client.post("/uploadfiles", json=updated_file_data.model_dump(), params={"testing": "True"})
+    response = client.post("/upload-files", json=updated_file_data.model_dump(), params={"testing": "True"})
 
     assert response.status_code == 200
     assert "updated 1" in response.json()["message"]
@@ -246,14 +244,16 @@ def test_get_lectures_success():
         "title": "Intro to Python",
         "slides": [{"name": "slide1", "content": "Content of slide 1"}],
         "quiz": [{"question": "What is 2+2?", "answer": "4", "options": ["3", "4", "5", "6"]}],
-        "required": []
+        "required": [],
+        "passmark" : 50
     })
     test_collection.insert_one({
         "difficulty": "easy",
         "title": "Basic Data Structures",
         "slides": [{"name": "slide1", "content": "Content of slide 1"}],
         "quiz": [{"question": "What is a list?", "answer": "A collection", "options": ["A number", "A collection", "A string"]}],
-        "required": ["Intro to Python"]
+        "required": ["Intro to Python"],
+        "passmark" : 100
     })
 
     response = client.get("/lectures/easy?testing=True")
@@ -275,3 +275,57 @@ def test_get_lectures_no_matches():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No lectures found for the given difficulty."
+
+def test_get_guided_projects_success():
+    test_collection.insert_one({
+        "name": "Simple Greeting Program",
+        "description": "Write a Python program that asks for the user's name and then prints a greeting message.",
+        "difficulty": "easy",
+        "steps": [
+            {
+                "title": "Create a function to greet the user",
+                "description": "Write a function that asks for the user's name and stores it in a variable.",
+                "code": "def greet_user():\n    name = ____\n    print('Hello, ' + name + '!')",
+                "options": [
+                    "name = input('What is your name? ')",
+                    "name = 'John'",
+                    "name = 42"
+                ]
+            },
+            {
+                "title": "Call the greet_user() function",
+                "description": "Call the greet_user function to display the greeting message to the user.",
+                "code": "____",
+                "options": [
+                    "greet_user()",
+                    "print('Hello World')",
+                    "input('Press enter to continue')"
+                ]
+            }
+        ],
+        "hints": [
+            "Use the `input()` function to get the user's name.",
+            "Make sure to call the function `greet_user()` to execute the greeting."
+        ],
+        "solution": "def greet_user():\n    name = input('What is your name? ')\n    print('Hello, ' + name + '!')\n\ngreet_user()"
+    })
+
+    response = client.get("/guided-projects?testing=True")
+
+    assert response.status_code == 200
+    guided_projects = response.json()["guidedProjects"]
+
+    assert len(guided_projects) == 1
+    assert guided_projects[0]["name"] == "Simple Greeting Program"
+    assert guided_projects[0]["description"] == "Write a Python program that asks for the user's name and then prints a greeting message."
+    assert guided_projects[0]["difficulty"] == "easy"
+    
+    steps = guided_projects[0]["steps"]
+    assert len(steps) == 2
+    assert len(steps[0]["options"]) == 3
+    
+def test_get_guided_projects_not_found():
+    response = client.get("/guided-projects?testing=True")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No guided projects found."

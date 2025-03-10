@@ -34,6 +34,24 @@ class LectureData(BaseModel):
     slides: List[SlideData]
     quiz: List[QuizData]
     required: List[str]
+    passmark: int
 
 class LectureList(BaseModel):
     lectures: List[LectureData]
+
+class StepData(BaseModel):
+    title: str
+    description: str
+    code: str
+    options: List[str]
+
+class GuidedProjectData(BaseModel):
+    name: str
+    description: str
+    difficulty: str
+    steps: List[StepData]
+    hints: List[str]
+    solution: str
+
+class GuidedProjectList(BaseModel):
+    guidedProjects: List[GuidedProjectData]

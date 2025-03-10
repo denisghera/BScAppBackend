@@ -20,6 +20,9 @@ def get_user_file_collection(testing: bool):
 def get_lecture_collection(testing: bool):
     return test_collection if testing else lecture_collection
 
+def get_guided_projects_collection(testing:bool):
+    return test_collection if testing else guided_projects_collection
+
 @app.post("/register")
 async def register_user(user: UserRegister, testing: bool = False):
     collection = get_user_collection(testing)
@@ -79,7 +82,7 @@ def verify_email(token: str, testing: bool = False):
 
     return {"message": "Email verified successfully! You can now log in."}
 
-@app.get("/dailypuzzle/{date}")
+@app.get("/daily-puzzle/{date}")
 def get_daily_puzzle(date: str, testing: bool = False):
     try:
         datetime.strptime(date, "%Y-%m-%d")
@@ -94,7 +97,7 @@ def get_daily_puzzle(date: str, testing: bool = False):
 
     return {"name" : puzzle["name"], "description" : puzzle["description"], "tests" : puzzle["tests"]}
 
-@app.get("/userfiles/{username}")
+@app.get("/user-files/{username}")
 def get_user_files(username: str, testing: bool = False):
     collection = get_user_file_collection(testing)
     
@@ -107,7 +110,7 @@ def get_user_files(username: str, testing: bool = False):
     
     return {"files": files}
 
-@app.post("/uploadfiles")
+@app.post("/upload-files")
 async def upload_user_files(fileList: UserFileList, testing: bool = False):
     collection = get_user_file_collection(testing)
     
@@ -139,20 +142,66 @@ def get_lectures(difficulty: str, testing: bool = False):
         raise HTTPException(status_code=404, detail="No lectures found for the given difficulty.")
     
     lectures_cursor = collection.find({"difficulty": difficulty})
-    
+
     lectures = []
     for lecture in lectures_cursor:
         lecture_data = LectureData(
             difficulty=lecture["difficulty"],
             title=lecture["title"],
-            slides=[SlideData(name=slide["name"], content=slide["content"]) for slide in lecture["slides"]],
-            quiz=[QuizData(question=quiz["question"], answer=quiz["answer"], options=quiz["options"]) for quiz in lecture["quiz"]],
-            required=[r for r in lecture["required"]]
+            slides=[
+                SlideData(
+                    name=slide["name"], 
+                    content=slide["content"]
+                ) 
+                for slide in lecture["slides"]
+            ],
+            quiz=[
+                QuizData(
+                    question=quiz["question"], 
+                    answer=quiz["answer"], 
+                    options=quiz["options"]
+                ) 
+                for quiz in lecture["quiz"]
+            ],
+            required=lecture["required"],
+            passmark=lecture["passmark"]
         )
         lectures.append(lecture_data)
     
     return {"lectures": lectures}
 
+@app.get("/guided-projects")
+def get_guided_projects(testing: bool = False):
+    collection = get_guided_projects_collection(testing)
+
+    count = collection.count_documents({})
+
+    if count == 0:
+        raise HTTPException(status_code=404, detail="No guided projects found.")
+    
+    projects_cursor = collection.find({})
+
+    guided_projects = []
+    for project in projects_cursor:
+        guided_project = GuidedProjectData(
+            name=project['name'],
+            description=project['description'],
+            difficulty=project['difficulty'],
+            steps=[
+                StepData(
+                    title=step['title'],
+                    description=step['description'],
+                    code=step['code'],
+                    options=step['options']
+                )
+                for step in project['steps']
+            ],
+            hints=project['hints'],
+            solution=project['solution']
+        )
+        guided_projects.append(guided_project)
+
+    return {"guidedProjects": guided_projects}
 
 @app.get("/")
 def home():
