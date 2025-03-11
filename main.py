@@ -192,7 +192,8 @@ def get_guided_projects(testing: bool = False):
                     title=step['title'],
                     description=step['description'],
                     code=step['code'],
-                    options=step['options']
+                    options=step['options'],
+                    answer=step['answer']
                 )
                 for step in project['steps']
             ],

@@ -44,6 +44,7 @@ class StepData(BaseModel):
     description: str
     code: str
     options: List[str]
+    answer: str
 
 class GuidedProjectData(BaseModel):
     name: str

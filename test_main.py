@@ -287,10 +287,11 @@ def test_get_guided_projects_success():
                 "description": "Write a function that asks for the user's name and stores it in a variable.",
                 "code": "def greet_user():\n    name = ____\n    print('Hello, ' + name + '!')",
                 "options": [
-                    "name = input('What is your name? ')",
-                    "name = 'John'",
-                    "name = 42"
-                ]
+                    "input('What is your name? ')",
+                    "'John'",
+                    "42"
+                ],
+                "answer": "input('What is your name? ')"
             },
             {
                 "title": "Call the greet_user() function",
@@ -300,7 +301,8 @@ def test_get_guided_projects_success():
                     "greet_user()",
                     "print('Hello World')",
                     "input('Press enter to continue')"
-                ]
+                ],
+                "answer": "greet_user()"
             }
         ],
         "hints": [
