@@ -428,3 +428,142 @@ def test_update_user_data():
     assert len(updated_user_data["completions"]["projects"]) == 3
     assert updated_user_data["completions"]["puzzles"][1] == "2025-03-12"
 
+def test_update_lecture_completion():
+    test_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": ["Existing Lecture"],
+            "projects": [],
+            "puzzles": []
+        }
+    })
+    new_lecture_request = LectureCompletionRequest(
+        username="testuser",
+        lecture="New Lecture"
+    )
+
+    response = client.post("/update-lecture-completion", json=new_lecture_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Lectures completion updated successfully"
+
+    user_data = test_collection.find_one({"username": "testuser"})
+    assert "New Lecture" in user_data["completions"]["lectures"]
+    assert len(user_data["completions"]["lectures"]) == 2
+
+def test_update_project_completion():
+    test_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": [],
+            "projects": ["Existing Project"],
+            "puzzles": []
+        }
+    })
+
+    new_project_request = ProjectCompletionRequest(
+        username="testuser",
+        project="New Project"
+    )
+
+    response = client.post("/update-project-completion", json=new_project_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Projects completion updated successfully"
+
+    user_data = test_collection.find_one({"username": "testuser"})
+    assert "New Project" in user_data["completions"]["projects"]
+    assert len(user_data["completions"]["projects"]) == 2
+
+def test_update_puzzle_completion():
+    test_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": [],
+            "projects": [],
+            "puzzles": ["2025-03-10"]
+        }
+    })
+
+    new_puzzle_request = PuzzleCompletionRequest(
+        username="testuser",
+        puzzle="2025-03-12"
+    )
+
+    response = client.post("/update-puzzle-completion", json=new_puzzle_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Puzzles completion updated successfully"
+
+    user_data = test_collection.find_one({"username": "testuser"})
+    assert "2025-03-12" in user_data["completions"]["puzzles"]
+    assert len(user_data["completions"]["puzzles"]) == 2
+
+def test_update_lecture_completion_no_changes():
+    test_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": ["Same Lecture"],
+            "projects": [],
+            "puzzles": []
+        }
+    })
+
+    new_lecture_request = LectureCompletionRequest(
+        username="testuser",
+        lecture="Same Lecture"
+    )
+
+    response = client.post("/update-lecture-completion", json=new_lecture_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "No changes made"
+
+    user_data = test_collection.find_one({"username": "testuser"})
+    assert len(user_data["completions"]["lectures"]) == 1
+
+def test_update_project_completion_no_changes():
+    test_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": [],
+            "projects": ["Same Project"],
+            "puzzles": []
+        }
+    })
+
+    new_project_request = ProjectCompletionRequest(
+        username="testuser",
+        project="Same Project"
+    )
+
+    response = client.post("/update-project-completion", json=new_project_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "No changes made"
+
+    user_data = test_collection.find_one({"username": "testuser"})
+    assert len(user_data["completions"]["projects"]) == 1
+
+def test_update_puzzle_completion_no_changes():
+    test_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": [],
+            "projects": [],
+            "puzzles": ["2025-03-10"]
+        }
+    })
+
+    new_puzzle_request = PuzzleCompletionRequest(
+        username="testuser",
+        puzzle="2025-03-10"
+    )
+
+    response = client.post("/update-puzzle-completion", json=new_puzzle_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "No changes made"
+
+    user_data = test_collection.find_one({"username": "testuser"})
+    assert len(user_data["completions"]["puzzles"]) == 1

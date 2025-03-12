@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from email_validator import validate_email, EmailNotValidError
 from datetime import datetime
 from pymongo import UpdateOne
@@ -130,6 +130,8 @@ async def upload_user_files(fileList: UserFileList, testing: bool = False):
     
     if operations:
         result = collection.bulk_write(operations)
+    else:
+        return {"message": "No operations"}
     
     return {
         "message": f"Successfully updated {result.matched_count} files, inserted {result.upserted_count} new files."
@@ -248,6 +250,39 @@ def create_or_update_user_data(user_data: UserData, testing: bool = False):
         return {"message": "User data updated successfully"}
     else:
         return {"message": "User data created successfully"}
+
+@app.post("/update-lecture-completion")
+def update_lecture_completion(request: LectureCompletionRequest, testing: bool = False):
+    collection = get_user_data_collection(testing)
+
+    result = collection.update_one(
+        {"username": request.username},
+        {"$addToSet": {"completions.lectures": request.lecture}}
+    )
+
+    return {"message": "Lectures completion updated successfully"} if result.modified_count else {"message": "No changes made"}
+
+@app.post("/update-project-completion")
+def update_project_completion(request: ProjectCompletionRequest, testing: bool = False):
+    collection = get_user_data_collection(testing)
+
+    result = collection.update_one(
+        {"username": request.username},
+        {"$addToSet": {"completions.projects": request.project}}
+    )
+    
+    return {"message": "Projects completion updated successfully"} if result.modified_count else {"message": "No changes made"}
+
+@app.post("/update-puzzle-completion")
+def update_puzzle_completion(request: PuzzleCompletionRequest, testing: bool = False):
+    collection = get_user_data_collection(testing)
+
+    result = collection.update_one(
+        {"username": request.username},
+        {"$addToSet": {"completions.puzzles": request.puzzle}}
+    )
+    
+    return {"message": "Puzzles completion updated successfully"} if result.modified_count else {"message": "No changes made"}
 
 @app.get("/")
 def home():

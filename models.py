@@ -65,3 +65,15 @@ class CompletionData(BaseModel):
 class UserData(BaseModel):
     username: str
     completions: CompletionData
+
+class LectureCompletionRequest(BaseModel):
+    username: str
+    lecture: str
+
+class ProjectCompletionRequest(BaseModel):
+    username: str
+    project: str
+
+class PuzzleCompletionRequest(BaseModel):
+    username: str
+    puzzle: str
