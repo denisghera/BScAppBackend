@@ -230,6 +230,25 @@ def get_user_data(username: str, testing: bool = False):
 
     return user_data
 
+@app.post("/user-data")
+def create_or_update_user_data(user_data: UserData, testing: bool = False):
+    collection = get_user_data_collection(testing)
+
+    result = collection.update_one(
+        {"username": user_data.username},
+        {"$set": {
+            "completions.lectures": user_data.completions.lectures,
+            "completions.projects": user_data.completions.projects,
+            "completions.puzzles": user_data.completions.puzzles
+        }},
+        upsert=True  # Creates a new document if one doesn’t exist
+    )
+
+    if result.matched_count:
+        return {"message": "User data updated successfully"}
+    else:
+        return {"message": "User data created successfully"}
+
 @app.get("/")
 def home():
     return {"message": "FastAPI MongoDB Backend is Running!"}

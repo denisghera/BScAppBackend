@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from main import app
 from config import test_collection
 from utils import hash_password
-from models import UserRegister, UserLogin, UserFileList, UserFile
+from models import *
 
 client = TestClient(app)
 
@@ -378,3 +378,53 @@ def test_get_user_data_many():
 
     assert response.status_code == 409
     assert response.json()["detail"] == "More than one user data found -> problem :("
+
+def test_create_user_data():
+    user_data = UserData(
+        username="testuser",
+        completions=CompletionData(
+            lectures=[],
+            projects=[],
+            puzzles=[]
+        )
+    )
+
+    response = client.post("/user-data", json=user_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "User data created successfully"
+
+    created_data_count = test_collection.count_documents({"username": "testuser"})
+    assert created_data_count == 1
+
+def test_update_user_data():
+    test_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": [],
+            "projects": ["a"],
+            "puzzles": []
+        }
+    })
+
+    user_data = UserData(
+        username="testuser",
+        completions=CompletionData(
+            lectures=["Intro 1"],
+            projects=["a", "b", "c"],
+            puzzles=["2025-03-10", "2025-03-12"]
+        )
+    )
+
+    response = client.post("/user-data", json=user_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "User data updated successfully"
+
+    user_data_count = test_collection.count_documents({"username": "testuser"})
+    assert user_data_count == 1
+
+    updated_user_data = test_collection.find_one({"username": "testuser"})
+    assert len(updated_user_data["completions"]["projects"]) == 3
+    assert updated_user_data["completions"]["puzzles"][1] == "2025-03-12"
+
