@@ -56,3 +56,12 @@ class GuidedProjectData(BaseModel):
 
 class GuidedProjectList(BaseModel):
     guidedProjects: List[GuidedProjectData]
+
+class CompletionData(BaseModel):
+    lectures: List[str]
+    projects: List[str]
+    puzzles: List[str]
+
+class UserData(BaseModel):
+    username: str
+    completions: CompletionData

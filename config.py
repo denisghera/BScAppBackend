@@ -10,11 +10,12 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client["test_db"]
-users_collection: Collection = db["users"]
+users_collection: Collection = db["user_credentials"]
 daily_puzzle_collection: Collection = db["daily_puzzles"]
 user_file_collection: Collection = db["user_files"]
 lecture_collection: Collection = db["lectures"]
 guided_projects_collection: Collection = db["guided_projects"]
+user_data_collection: Collection = db["user_data"]
 test_collection: Collection = db["test_collection"]
 
 # Email Configuration

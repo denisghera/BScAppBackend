@@ -23,6 +23,9 @@ def get_lecture_collection(testing: bool):
 def get_guided_projects_collection(testing:bool):
     return test_collection if testing else guided_projects_collection
 
+def get_user_data_collection(testing:bool):
+    return test_collection if testing else user_data_collection
+
 @app.post("/register")
 async def register_user(user: UserRegister, testing: bool = False):
     collection = get_user_collection(testing)
@@ -203,6 +206,29 @@ def get_guided_projects(testing: bool = False):
         guided_projects.append(guided_project)
 
     return {"guidedProjects": guided_projects}
+
+@app.get("/user-data/{username}")
+def get_user_data(username: str, testing: bool = False):
+    collection = get_user_data_collection(testing)
+
+    count = collection.count_documents({"username" : username})
+
+    if count == 0:
+        raise HTTPException(status_code=404, detail="No user data found -> problem :(")
+    elif count > 1:
+        raise HTTPException(status_code=409, detail="More than one user data found -> problem :(")
+
+    user_data_cursor = collection.find_one({"username" : username})
+    user_data = UserData(
+            username=user_data_cursor.get("username"),
+            completions=CompletionData(
+                lectures=user_data_cursor["completions"]["lectures"],
+                projects=user_data_cursor["completions"]["projects"],
+                puzzles=user_data_cursor["completions"]["puzzles"]
+            )
+    )
+
+    return user_data
 
 @app.get("/")
 def home():

@@ -331,3 +331,50 @@ def test_get_guided_projects_not_found():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No guided projects found."
+
+def test_get_user_data_success():
+    test_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": ["Intro 1"],
+            "projects": [],
+            "puzzles": ["2025-03-10", "2025-03-12"]
+        }
+    })
+
+    response = client.get("/user-data/testuser?testing=True")
+
+    assert response.status_code == 200
+    user_data = response.json()
+
+    assert user_data["username"] == "testuser"
+    assert len(user_data["completions"]["puzzles"]) == 2
+
+def test_get_user_data_not_found():
+    response = client.get("/user-data/nonexistinguser?testing=True")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No user data found -> problem :("
+
+def test_get_user_data_many():
+    test_collection.insert_one({
+        "username": "testuserduplicate",
+        "completions": {
+            "lectures": ["Intro 1"],
+            "projects": [],
+            "puzzles": ["2025-03-10", "2025-03-12"]
+        }
+    })
+    test_collection.insert_one({
+        "username": "testuserduplicate",
+        "completions": {
+            "lectures": [],
+            "projects": ["First Proj"],
+            "puzzles": ["2025-03-12"]
+        }
+    })
+
+    response = client.get("/user-data/testuserduplicate?testing=True")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "More than one user data found -> problem :("
