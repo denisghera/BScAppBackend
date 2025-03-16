@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from email_validator import validate_email, EmailNotValidError
 from datetime import datetime
 from pymongo import UpdateOne
 from config import *
 from models import *
 from utils import *
+import subprocess
+import uuid
 
 app = FastAPI()
 
@@ -283,6 +285,26 @@ def update_puzzle_completion(request: PuzzleCompletionRequest, testing: bool = F
     )
     
     return {"message": "Puzzles completion updated successfully"} if result.modified_count else {"message": "No changes made"}
+
+@app.post("/execute-code")
+def execute_code(request: CodeRequest):
+    temp_file = f"temp_script_{uuid.uuid4().hex}.py"
+    try:
+        with open(temp_file, "w") as f:
+            f.write(request.code)
+        
+        result = subprocess.run(["python", temp_file], capture_output=True, text=True)
+
+        if result.returncode != 0:
+            clean_error = extract_error_message(result.stderr)
+            return {"status": "error", "message": clean_error}
+
+        return {"status": "success", "output": result.stdout}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
 @app.get("/")
 def home():

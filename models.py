@@ -77,3 +77,6 @@ class ProjectCompletionRequest(BaseModel):
 class PuzzleCompletionRequest(BaseModel):
     username: str
     puzzle: str
+
+class CodeRequest(BaseModel):
+    code: str

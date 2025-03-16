@@ -567,3 +567,23 @@ def test_update_puzzle_completion_no_changes():
 
     user_data = test_collection.find_one({"username": "testuser"})
     assert len(user_data["completions"]["puzzles"]) == 1
+
+def test_execute_code_successful():
+    code_request = CodeRequest(
+        code="print(\"hello world\")"
+    )
+    response = client.post("/execute-code", json=code_request.model_dump())
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+
+    assert "output" in response.json()
+    assert response.json()["output"] == "hello world\n"
+
+def test_execute_code_unsuccessful():
+    code_request = CodeRequest(
+        code="badcode(abc)"
+    )
+    response = client.post("/execute-code", json=code_request.model_dump())
+
+    assert response.json()["status"] == "error"

@@ -1,4 +1,4 @@
-from utils import hash_password, verify_password, generate_unique_token
+from utils import *
 
 def test_hash_password():
     password = "securepassword123"
@@ -21,3 +21,9 @@ def test_generate_unique_token():
     assert isinstance(token2, str)
     assert token1 != token2
 
+def test_extract_error_message():
+    assert extract_error_message("Something went wrong - ValueError: invalid literal for int()") == "ValueError: invalid literal for int()"
+    assert extract_error_message("some random words: SyntaxError: unexpected EOF while parsing") == "SyntaxError: unexpected EOF while parsing"
+    assert extract_error_message("This is not an error message") == "Unknown Error"
+    assert extract_error_message("") == "Unknown Error"
+    assert extract_error_message("   ") == "Unknown Error"
