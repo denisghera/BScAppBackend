@@ -7,6 +7,8 @@ A simple backend service for user registration, login, and email verification bu
 - User registration with email, username, and password.
 - Email verification with a unique token.
 - Secure login with password hashing using bcrypt.
+- Data fetching/sending for different purposes in-game.
+- Running Python code server-side, sending the output back to the client.
 
 ## Setup
 
