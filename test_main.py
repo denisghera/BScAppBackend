@@ -587,3 +587,60 @@ def test_execute_code_unsuccessful():
     response = client.post("/execute-code", json=code_request.model_dump())
 
     assert response.json()["status"] == "error"
+
+def test_create_classroom_duplicate_name():
+    test_collection.insert_one({
+        "owner": "boss", 
+        "name": "test-clasroom", 
+        "capacity": 3
+    })
+    
+    room_request = RoomRequest(
+        owner="test_owner",
+        name="test-clasroom",
+        capacity=1
+    )
+
+    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Name for classroom already taken"
+
+def test_create_classroom_duplicate_code():
+    test_collection.insert_one({
+        "owner": "boss", 
+        "name": "test-clasroom", 
+        "capacity": 3,
+        "code": "ABC123"
+    })
+
+    room_request = RoomRequest(
+        owner="test_owner",
+        name="second-clasroom",
+        capacity=1
+    ) 
+    # Default access code is hardcoded as ABC123 for testing in main function
+
+    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+
+    assert response.json()["code"] != 'ABC123'
+
+    count = test_collection.count_documents({"code": "ABC123"})
+    assert count == 1
+
+
+def test_create_classroom_success():
+    room_request = RoomRequest(
+        owner="test_owner",
+        name="test-clasroom",
+        capacity=1
+    )
+
+    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+
+    count = test_collection.count_documents({"name": "test-clasroom"})
+    assert count == 1

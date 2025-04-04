@@ -22,11 +22,14 @@ def get_user_file_collection(testing: bool):
 def get_lecture_collection(testing: bool):
     return test_collection if testing else lecture_collection
 
-def get_guided_projects_collection(testing:bool):
+def get_guided_projects_collection(testing: bool):
     return test_collection if testing else guided_projects_collection
 
-def get_user_data_collection(testing:bool):
+def get_user_data_collection(testing: bool):
     return test_collection if testing else user_data_collection
+
+def get_classroom_data_collection(testing: bool):
+    return test_collection if testing else classroom_data_collection
 
 @app.post("/register")
 async def register_user(user: UserRegister, testing: bool = False):
@@ -337,6 +340,32 @@ def execute_code(request: CodeRequest):
     finally:
         if os.path.exists(temp_file):
             os.remove(temp_file)
+
+@app.post("/create-room")
+def create_room(request: RoomRequest, testing: bool = False):
+    collection = get_classroom_data_collection(testing)
+
+    if collection.find_one({"name": request.name}):
+        raise HTTPException(status_code=400, detail="Name for classroom already taken")
+    
+    if testing:
+        access_code = 'ABC123'
+    else:
+        access_code = generate_access_code()
+
+    # Make sure code is unique
+    while collection.find_one({"code": access_code}):
+        access_code = generate_access_code()
+
+    room_data = {
+        "owner": request.owner,
+        "name": request.name,
+        "capacity": request.capacity,
+        "code" : access_code
+    }
+    collection.insert_one(room_data)
+
+    return {"message": "Classroom created with success!", "code": access_code}
 
 @app.get("/")
 def home():

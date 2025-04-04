@@ -1,5 +1,6 @@
 import bcrypt
 import secrets
+import string
 import re
 from fastapi_mail import FastMail, MessageSchema
 from config import *
@@ -34,3 +35,7 @@ async def send_verification_email(email: str, token: str):
 def extract_error_message(error_text):
     match = re.search(r"(\w*Error):\s*(.*)", error_text)
     return match.group(1) + ": " + match.group(2) if match else "Unknown Error"
+
+def generate_access_code(length = 6):
+    characters = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(characters) for _ in range(length))

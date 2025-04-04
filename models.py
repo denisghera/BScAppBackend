@@ -83,3 +83,8 @@ class PuzzleCompletionRequest(BaseModel):
 
 class CodeRequest(BaseModel):
     code: str
+
+class RoomRequest(BaseModel):
+    owner: str
+    name: str
+    capacity: int
