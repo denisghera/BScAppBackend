@@ -10,6 +10,9 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class UsernameRequest(BaseModel):
+    username: str
+    
 class UserFile(BaseModel):
     owner: str
     name: str

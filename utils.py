@@ -2,7 +2,7 @@ import bcrypt
 import secrets
 import re
 from fastapi_mail import FastMail, MessageSchema
-from config import conf, users_collection
+from config import *
 
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
@@ -15,7 +15,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 def generate_unique_token() -> str:
     while True:
         token = secrets.token_urlsafe(32)
-        if not users_collection.find_one({"token": token}):
+        if not user_credentials_collection.find_one({"token": token}):
             return token  
 
 

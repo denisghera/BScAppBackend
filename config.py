@@ -3,6 +3,7 @@ from pymongo.collection import Collection
 from dotenv import load_dotenv
 import os
 from fastapi_mail import ConnectionConfig
+from datetime import timedelta
 
 load_dotenv()
 
@@ -10,13 +11,15 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
 db = client["test_db"]
-users_collection: Collection = db["user_credentials"]
+user_credentials_collection: Collection = db["user_credentials"]
 daily_puzzle_collection: Collection = db["daily_puzzles"]
 user_file_collection: Collection = db["user_files"]
 lecture_collection: Collection = db["lectures"]
 guided_projects_collection: Collection = db["guided_projects"]
 user_data_collection: Collection = db["user_data"]
 test_collection: Collection = db["test_collection"]
+
+SESSION_TIMEOUT = timedelta(minutes=10)
 
 # Email Configuration
 conf = ConnectionConfig(

@@ -10,8 +10,8 @@ import uuid
 
 app = FastAPI()
 
-def get_user_collection(testing: bool):
-    return test_collection if testing else users_collection
+def get_user_credentials_collection(testing: bool):
+    return test_collection if testing else user_credentials_collection
 
 def get_daily_puzzle_collection(testing: bool):
     return test_collection if testing else daily_puzzle_collection
@@ -30,7 +30,7 @@ def get_user_data_collection(testing:bool):
 
 @app.post("/register")
 async def register_user(user: UserRegister, testing: bool = False):
-    collection = get_user_collection(testing)
+    collection = get_user_credentials_collection(testing)
     try:
         validate_email(user.email)
     except EmailNotValidError:
@@ -61,24 +61,42 @@ async def register_user(user: UserRegister, testing: bool = False):
     
 @app.post("/login")
 def login_user(user: UserLogin, testing: bool = False):
-    collection = get_user_collection(testing)
+    collection = get_user_credentials_collection(testing)
     dbUser = collection.find_one({"username": user.username})
     
-    if not dbUser:
-        print("User not found in DB!")
+    if not dbUser or not verify_password(user.password, dbUser["password"]):
         raise HTTPException(status_code=400, detail="Invalid username or password")
 
     if not dbUser.get("verified", True):
         raise HTTPException(status_code=400, detail="Email not verified. Please check your inbox.")
+    
+    ud_collection = get_user_data_collection(testing)
+    count = ud_collection.count_documents({"username" : user.username})
 
-    if not verify_password(user.password, dbUser["password"]):
-        raise HTTPException(status_code=400, detail="Invalid username or password")
+    if count == 0:
+        new_user_data = UserData(
+            username=user.username,
+            completions=CompletionData(
+                lectures=[], projects=[], puzzles=[]
+            )
+        )
+        create_or_update_user_data(new_user_data, testing)
+
+    user_data = ud_collection.find_one({"username": user.username})
+
+    if user_data.get("online", False):
+        last_active = user_data.get("last_activity", datetime.now() - timedelta(days=1))
+        print(datetime.now() - last_active)
+        if datetime.now() - last_active < SESSION_TIMEOUT:
+            raise HTTPException(status_code=400, detail="User already logged in. Try again later or contact support.")
+    
+    ud_collection.update_one({"username": user.username}, {"$set": {"online": True, "last_activity": datetime.now()}})
 
     return {"message": "Login successful!"}
 
 @app.get("/verify/{token}")
 def verify_email(token: str, testing: bool = False):
-    collection = get_user_collection(testing)
+    collection = get_user_credentials_collection(testing)
     user = collection.find_one({"token": token})
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
@@ -86,6 +104,18 @@ def verify_email(token: str, testing: bool = False):
     collection.update_one({"token": token}, {"$set": {"verified": True}, "$unset": {"token": ""}})
 
     return {"message": "Email verified successfully! You can now log in."}
+
+@app.post("/logout")
+def logout_user(username: UsernameRequest, testing: bool = False):
+    collection = get_user_data_collection(testing)
+
+    user = collection.find_one({"username": username.username})
+    if not user or not user.get("online", False):
+        raise HTTPException(status_code=400, detail="User is not logged in.")
+
+    collection.update_one({"username": username.username}, {"$set": {"online": False}})
+
+    return {"message": "Logout successful!"}
 
 @app.get("/daily-puzzle/{date}")
 def get_daily_puzzle(date: str, testing: bool = False):
@@ -243,7 +273,9 @@ def create_or_update_user_data(user_data: UserData, testing: bool = False):
         {"$set": {
             "completions.lectures": user_data.completions.lectures,
             "completions.projects": user_data.completions.projects,
-            "completions.puzzles": user_data.completions.puzzles
+            "completions.puzzles": user_data.completions.puzzles,
+            "online": False,
+            "last_activity": datetime.now()
         }},
         upsert=True  # Creates a new document if one doesn’t exist
     )
