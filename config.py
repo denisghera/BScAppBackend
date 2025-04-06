@@ -21,7 +21,6 @@ user_data_collection: Collection = db["user_data"]
 
 classroom_data_collection: Collection = db["classroom_data"]
 tutor_credentials_collection: Collection = db["tutor_credentials"]
-tutor_data_collection: Collection = db["tutor_data"]
 
 test_collection: Collection = db["test_collection"]
 

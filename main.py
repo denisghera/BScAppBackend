@@ -28,6 +28,9 @@ def get_guided_projects_collection(testing: bool):
 def get_user_data_collection(testing: bool):
     return test_collection if testing else user_data_collection
 
+def get_tutor_credentials_collection(testing: bool):
+    return test_collection if testing else tutor_credentials_collection
+
 def get_classroom_data_collection(testing: bool):
     return test_collection if testing else classroom_data_collection
 
@@ -341,6 +344,56 @@ def execute_code(request: CodeRequest):
         if os.path.exists(temp_file):
             os.remove(temp_file)
 
+@app.post("/register-tutor")
+async def register_tutor(tutor: TutorRegister, testing: bool = False):
+    collection = get_tutor_credentials_collection(testing)
+    try:
+        validate_email(tutor.email)
+    except EmailNotValidError:
+        raise HTTPException(status_code=400, detail="Invalid email format")
+
+    if collection.find_one({"username": tutor.username}):
+        raise HTTPException(status_code=400, detail="Tutor username already taken")
+
+    if len(tutor.password) < 8:
+        raise HTTPException(status_code=400, detail="Password too short")
+    hashed_password = hash_password(tutor.password)
+
+    token = generate_unique_token()
+
+    dbTutor = {
+        "email": tutor.email,
+        "username": tutor.username,
+        "password": hashed_password,
+        "type": tutor.type,
+        "institution": tutor.institution,
+        "verified": False,
+        "token": token,
+        "approved": False
+    }
+    collection.insert_one(dbTutor)
+    
+    if not testing:
+        await send_verification_email(tutor.email, token)
+
+    return {"message": "Tutor registered successfully! Please check your email to verify your account."}
+    
+@app.post("/login-tutor")
+def login_tutor(tutor: UserLogin, testing: bool = False):
+    collection = get_tutor_credentials_collection(testing)
+    dbTutor = collection.find_one({"username": tutor.username})
+    
+    if not dbTutor or not verify_password(tutor.password, dbTutor["password"]):
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+
+    if not dbTutor.get("verified", True):
+        raise HTTPException(status_code=400, detail="Email not verified. Please check your inbox.")
+    
+    if not dbTutor.get("approved", True):
+        raise HTTPException(status_code=400, detail="Account not approved yet. Please wait until notified or contact an admin.")
+    
+    return {"message": "Login successful!"}
+    
 @app.post("/create-room")
 def create_room(request: RoomRequest, testing: bool = False):
     collection = get_classroom_data_collection(testing)

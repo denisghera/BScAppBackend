@@ -88,3 +88,10 @@ class RoomRequest(BaseModel):
     owner: str
     name: str
     capacity: int
+
+class TutorRegister(BaseModel):
+    username: str
+    password: str
+    email: str
+    type: str
+    institution: str

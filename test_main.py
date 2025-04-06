@@ -644,3 +644,122 @@ def test_create_classroom_success():
 
     count = test_collection.count_documents({"name": "test-clasroom"})
     assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_register_tutor():
+    tutor_data = TutorRegister(
+        email="testtutor@gmail.com",
+        username="testuser",
+        password="strongpassword",
+        type="Teacher",
+        institution="Test High School"
+    )
+
+    response = client.post("/register-tutor", json=tutor_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Tutor registered successfully! Please check your email to verify your account."
+
+@pytest.mark.asyncio
+async def test_register_duplicate_tutor():
+    test_collection.insert_one({
+        "username": "testtutor", 
+        "email": "test@example.com", 
+        "password": hash_password("password")
+    })
+    
+    tutor_data = TutorRegister(
+        email="test2@gmail.com", 
+        username="testtutor", 
+        password="anotherpassword",
+        type="Parent",
+        institution="No institution"
+    )
+
+    response = client.post("/register-tutor", json=tutor_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Tutor username already taken"
+
+def test_register_invalid_email_tutor():
+    tutor_data = TutorRegister(
+        email="not-an-email", 
+        username="testtutor", 
+        password="anotherpassword",
+        type="Parent",
+        institution="No institution"
+    )
+
+    response = client.post("/register-tutor", json=tutor_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid email format"
+
+def test_login_tutor_invalid_password():
+    test_collection.insert_one({
+        "username": "testtutor", 
+        "password": hash_password("correctpassword"), 
+        "verified": True
+    })
+
+    tutor_data = UserLogin(
+        username="testtutor",
+        password="wrongpassword"
+    )
+
+    response = client.post("/login-tutor", json=tutor_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid username or password"
+
+def test_login_tutor_unverified_email():
+    test_collection.insert_one({
+        "username": "unverified_tutor", 
+        "password": hash_password("password"),
+        "verified": False
+    })
+
+    tutor_data = UserLogin(
+        username="unverified_tutor", 
+        password="password"
+    )
+
+    response = client.post("/login-tutor", json=tutor_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Email not verified. Please check your inbox."
+
+def test_login_tutor_not_approved():
+    test_collection.insert_one({
+        "username": "unapproved_tutor", 
+        "password": hash_password("password"),
+        "approved": False
+    })
+
+    tutor_data = UserLogin(
+        username="unapproved_tutor", 
+        password="password"
+    )
+
+    response = client.post("/login-tutor", json=tutor_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Account not approved yet. Please wait until notified or contact an admin."
+
+def test_login_tutor_success():
+    test_collection.insert_one({
+        "username": "testtutor", 
+        "password": hash_password("mypassword"), 
+        "verified": True
+    })
+
+    tutor_data = UserLogin(
+        username="testtutor", 
+        password="mypassword"
+    )
+
+    response = client.post("/login-tutor", json=tutor_data.model_dump(), params={"testing": "True"})
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Login successful!"
