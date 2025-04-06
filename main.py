@@ -61,7 +61,7 @@ async def register_user(user: UserRegister, testing: bool = False):
     collection.insert_one(dbUser)
     
     if not testing:
-        await send_verification_email(user.email, token)
+        await send_verification_email(user.email, token, 'user')
 
     return {"message": "User registered successfully! Please check your email to verify your account."}
     
@@ -374,7 +374,7 @@ async def register_tutor(tutor: TutorRegister, testing: bool = False):
     collection.insert_one(dbTutor)
     
     if not testing:
-        await send_verification_email(tutor.email, token)
+        await send_verification_email(tutor.email, token, 'tutor')
 
     return {"message": "Tutor registered successfully! Please check your email to verify your account."}
     
@@ -393,7 +393,18 @@ def login_tutor(tutor: UserLogin, testing: bool = False):
         raise HTTPException(status_code=400, detail="Account not approved yet. Please wait until notified or contact an admin.")
     
     return {"message": "Login successful!"}
-    
+
+@app.get("/verify-tutor/{token}")
+def verify_tutor_email(token: str, testing: bool = False):
+    collection = get_tutor_credentials_collection(testing)
+    tutor = collection.find_one({"token": token})
+    if not tutor:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    collection.update_one({"token": token}, {"$set": {"verified": True}, "$unset": {"token": ""}})
+
+    return {"message": "Email verified successfully! Please wait for approval notification or contact an admin."}
+
 @app.post("/create-room")
 def create_room(request: RoomRequest, testing: bool = False):
     collection = get_classroom_data_collection(testing)
