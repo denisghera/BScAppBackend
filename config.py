@@ -22,7 +22,7 @@ user_data_collection: Collection = db["user_data"]
 classroom_data_collection: Collection = db["classroom_data"]
 tutor_credentials_collection: Collection = db["tutor_credentials"]
 
-test_collection: Collection = db["test_collection"]
+mock_collection: Collection = db["test_collection"]
 
 SESSION_TIMEOUT = timedelta(minutes=10)
 

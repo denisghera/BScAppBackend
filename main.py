@@ -11,28 +11,28 @@ import uuid
 app = FastAPI()
 
 def get_user_credentials_collection(testing: bool):
-    return test_collection if testing else user_credentials_collection
+    return mock_collection if testing else user_credentials_collection
 
 def get_daily_puzzle_collection(testing: bool):
-    return test_collection if testing else daily_puzzle_collection
+    return mock_collection if testing else daily_puzzle_collection
 
 def get_user_file_collection(testing: bool):
-    return test_collection if testing else user_file_collection
+    return mock_collection if testing else user_file_collection
 
 def get_lecture_collection(testing: bool):
-    return test_collection if testing else lecture_collection
+    return mock_collection if testing else lecture_collection
 
 def get_guided_projects_collection(testing: bool):
-    return test_collection if testing else guided_projects_collection
+    return mock_collection if testing else guided_projects_collection
 
 def get_user_data_collection(testing: bool):
-    return test_collection if testing else user_data_collection
+    return mock_collection if testing else user_data_collection
 
 def get_tutor_credentials_collection(testing: bool):
-    return test_collection if testing else tutor_credentials_collection
+    return mock_collection if testing else tutor_credentials_collection
 
 def get_classroom_data_collection(testing: bool):
-    return test_collection if testing else classroom_data_collection
+    return mock_collection if testing else classroom_data_collection
 
 @app.post("/register")
 async def register_user(user: UserRegister, testing: bool = False):
@@ -406,7 +406,7 @@ def verify_tutor_email(token: str, testing: bool = False):
     return {"message": "Email verified successfully! Please wait for approval notification or contact an admin."}
 
 @app.post("/create-room")
-def create_room(request: RoomRequest, testing: bool = False):
+def create_room(request: RoomData, testing: bool = False):
     collection = get_classroom_data_collection(testing)
 
     if collection.find_one({"name": request.name}):
@@ -430,6 +430,19 @@ def create_room(request: RoomRequest, testing: bool = False):
     collection.insert_one(room_data)
 
     return {"message": "Classroom created with success!", "code": access_code}
+
+@app.get("/rooms/{owner}")
+def get_rooms(owner: str, testing: bool = False):
+    collection = get_classroom_data_collection(testing)
+
+    rooms_cursor = collection.find(
+        {"owner": owner},
+        {"_id": 0}
+    )
+    
+    rooms = list(rooms_cursor)
+    
+    return {"rooms": rooms}
 
 @app.get("/")
 def home():
