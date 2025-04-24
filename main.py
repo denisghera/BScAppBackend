@@ -409,6 +409,11 @@ def verify_tutor_email(token: str, testing: bool = False):
 def create_room(request: RoomData, testing: bool = False):
     collection = get_classroom_data_collection(testing)
 
+    count = collection.count_documents({"owner" : request.owner})
+
+    if count == 4:
+        raise HTTPException(status_code=400, detail="Room creation limit reached")
+
     if collection.find_one({"name": request.name}):
         raise HTTPException(status_code=400, detail="Name for classroom already taken")
     
@@ -443,6 +448,20 @@ def get_rooms(owner: str, testing: bool = False):
     rooms = list(rooms_cursor)
     
     return {"rooms": rooms}
+
+@app.get("/room/{code}")
+def get_room_by_code(code: str, testing: bool = False):
+    collection = get_classroom_data_collection(testing)
+
+    room = collection.find_one(
+        {"code": code},
+        {"_id": 0}
+    )
+
+    if not room:
+        raise HTTPException(status_code=404, detail="Room code doesn't exist")
+
+    return room
 
 @app.get("/")
 def home():
