@@ -21,6 +21,7 @@ class UserFile(BaseModel):
 
 class UserFileList(BaseModel):
     files: List[UserFile]
+    room: str
 
 class SlideData(BaseModel):
     name: str
@@ -67,18 +68,22 @@ class CompletionData(BaseModel):
 
 class UserData(BaseModel):
     username: str
+    room: str
     completions: CompletionData
 
 class LectureCompletionRequest(BaseModel):
     username: str
+    room: str
     lecture: str
 
 class ProjectCompletionRequest(BaseModel):
     username: str
+    room: str
     project: str
 
 class PuzzleCompletionRequest(BaseModel):
     username: str
+    room: str
     puzzle: str
 
 class CodeRequest(BaseModel):

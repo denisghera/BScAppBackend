@@ -76,28 +76,6 @@ def login_user(user: UserLogin, testing: bool = False):
     if not dbUser.get("verified", True):
         raise HTTPException(status_code=400, detail="Email not verified. Please check your inbox.")
     
-    ud_collection = get_user_data_collection(testing)
-    count = ud_collection.count_documents({"username" : user.username})
-
-    if count == 0:
-        new_user_data = UserData(
-            username=user.username,
-            completions=CompletionData(
-                lectures=[], projects=[], puzzles=[]
-            )
-        )
-        create_or_update_user_data(new_user_data, testing)
-
-    user_data = ud_collection.find_one({"username": user.username})
-
-    if user_data.get("online", False):
-        last_active = user_data.get("last_activity", datetime.now() - timedelta(days=1))
-        print(datetime.now() - last_active)
-        if datetime.now() - last_active < SESSION_TIMEOUT:
-            raise HTTPException(status_code=400, detail="User already logged in. Try again later or contact support.")
-    
-    ud_collection.update_one({"username": user.username}, {"$set": {"online": True, "last_activity": datetime.now()}})
-
     return {"message": "Login successful!"}
 
 @app.get("/verify/{token}")
@@ -111,39 +89,27 @@ def verify_email(token: str, testing: bool = False):
 
     return {"message": "Email verified successfully! You can now log in."}
 
-@app.post("/logout")
-def logout_user(username: UsernameRequest, testing: bool = False):
-    collection = get_user_data_collection(testing)
-
-    user = collection.find_one({"username": username.username})
-    if not user or not user.get("online", False):
-        raise HTTPException(status_code=400, detail="User is not logged in.")
-
-    collection.update_one({"username": username.username}, {"$set": {"online": False}})
-
-    return {"message": "Logout successful!"}
-
-@app.get("/daily-puzzle/{date}")
-def get_daily_puzzle(date: str, testing: bool = False):
+@app.get("/daily-puzzle/{room}/{date}")
+def get_daily_puzzle(room: str, date: str, testing: bool = False):
     try:
         datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
     
     collection = get_daily_puzzle_collection(testing)
-    puzzle = collection.find_one({"date": date})
+    puzzle = collection.find_one({"date": date, "room": room})
     
     if not puzzle:
         raise HTTPException(status_code=404, detail="No puzzle available")
 
     return {"name" : puzzle["name"], "description" : puzzle["description"], "tests" : puzzle["tests"]}
 
-@app.get("/user-files/{username}")
-def get_user_files(username: str, testing: bool = False):
+@app.get("/user-files/{room}/{username}")
+def get_user_files(room: str, username: str, testing: bool = False):
     collection = get_user_file_collection(testing)
     
     files_cursor = collection.find(
-        {"owner": username},
+        {"room" : room, "owner" : username},
         {"_id": 0}
     )
     
@@ -160,7 +126,7 @@ async def upload_user_files(fileList: UserFileList, testing: bool = False):
     for file in fileList.files:
         operations.append(
             UpdateOne(
-                {"owner": file.owner, "name": file.name, "purpose": file.purpose},
+                {"owner": file.owner, "room": fileList.room, "name": file.name, "purpose": file.purpose},
                 {"$set": file.model_dump()},
                 upsert=True
             )
@@ -175,16 +141,16 @@ async def upload_user_files(fileList: UserFileList, testing: bool = False):
         "message": f"Successfully updated {result.matched_count} files, inserted {result.upserted_count} new files."
     }
 
-@app.get("/lectures/{difficulty}")
-def get_lectures(difficulty: str, testing: bool = False):
+@app.get("/lectures/{room}/{difficulty}")
+def get_lectures(room: str, difficulty: str, testing: bool = False):
     collection = get_lecture_collection(testing)
     
-    count = collection.count_documents({"difficulty": difficulty})
+    count = collection.count_documents({"room": room, "difficulty": difficulty})
     
     if count == 0:
         raise HTTPException(status_code=404, detail="No lectures found for the given difficulty.")
     
-    lectures_cursor = collection.find({"difficulty": difficulty})
+    lectures_cursor = collection.find({"room": room, "difficulty": difficulty})
 
     lectures = []
     for lecture in lectures_cursor:
@@ -213,16 +179,16 @@ def get_lectures(difficulty: str, testing: bool = False):
     
     return {"lectures": lectures}
 
-@app.get("/guided-projects")
-def get_guided_projects(testing: bool = False):
+@app.get("/guided-projects/{room}")
+def get_guided_projects(room: str, testing: bool = False):
     collection = get_guided_projects_collection(testing)
 
-    count = collection.count_documents({})
+    count = collection.count_documents({"room": room})
 
     if count == 0:
         raise HTTPException(status_code=404, detail="No guided projects found.")
     
-    projects_cursor = collection.find({})
+    projects_cursor = collection.find({"room": room})
 
     guided_projects = []
     for project in projects_cursor:
@@ -247,25 +213,26 @@ def get_guided_projects(testing: bool = False):
 
     return {"guidedProjects": guided_projects}
 
-@app.get("/user-data/{username}")
-def get_user_data(username: str, testing: bool = False):
+@app.get("/user-data/{username}/{room}")
+def get_user_data(username: str, room: str, testing: bool = False):
     collection = get_user_data_collection(testing)
 
-    count = collection.count_documents({"username" : username})
+    count = collection.count_documents({"username" : username, "room": room})
 
     if count == 0:
-        raise HTTPException(status_code=404, detail="No user data found -> problem :(")
+        raise HTTPException(status_code=404, detail="No user data found")
     elif count > 1:
         raise HTTPException(status_code=409, detail="More than one user data found -> problem :(")
 
-    user_data_cursor = collection.find_one({"username" : username})
+    user_data_cursor = collection.find_one({"username" : username, "room": room})
     user_data = UserData(
             username=user_data_cursor.get("username"),
             completions=CompletionData(
                 lectures=user_data_cursor["completions"]["lectures"],
                 projects=user_data_cursor["completions"]["projects"],
                 puzzles=user_data_cursor["completions"]["puzzles"]
-            )
+            ),
+            room=user_data_cursor.get("room")
     )
 
     return user_data
@@ -275,13 +242,11 @@ def create_or_update_user_data(user_data: UserData, testing: bool = False):
     collection = get_user_data_collection(testing)
 
     result = collection.update_one(
-        {"username": user_data.username},
+        {"username": user_data.username, "room": user_data.room},
         {"$set": {
             "completions.lectures": user_data.completions.lectures,
             "completions.projects": user_data.completions.projects,
-            "completions.puzzles": user_data.completions.puzzles,
-            "online": False,
-            "last_activity": datetime.now()
+            "completions.puzzles": user_data.completions.puzzles
         }},
         upsert=True  # Creates a new document if one doesn’t exist
     )
@@ -296,7 +261,7 @@ def update_lecture_completion(request: LectureCompletionRequest, testing: bool =
     collection = get_user_data_collection(testing)
 
     result = collection.update_one(
-        {"username": request.username},
+        {"username": request.username, "room": request.room},
         {"$addToSet": {"completions.lectures": request.lecture}}
     )
 
@@ -307,7 +272,7 @@ def update_project_completion(request: ProjectCompletionRequest, testing: bool =
     collection = get_user_data_collection(testing)
 
     result = collection.update_one(
-        {"username": request.username},
+        {"username": request.username, "room": request.room},
         {"$addToSet": {"completions.projects": request.project}}
     )
     
@@ -318,7 +283,7 @@ def update_puzzle_completion(request: PuzzleCompletionRequest, testing: bool = F
     collection = get_user_data_collection(testing)
 
     result = collection.update_one(
-        {"username": request.username},
+        {"username": request.username, "room": request.room},
         {"$addToSet": {"completions.puzzles": request.puzzle}}
     )
     

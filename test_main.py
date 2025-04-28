@@ -147,10 +147,11 @@ def test_get_daily_puzzle_valid_date():
         "date": "2024-03-05",
         "name": "Test Puzzle",
         "description": "Solve this challenge",
-        "tests": ["add(2,5) == 7", "add(150,325) == 475"]
+        "tests": ["add(2,5) == 7", "add(150,325) == 475"],
+        "room" : "ABCDEF"
     })
 
-    response = client.get("/daily-puzzle/2024-03-05?testing=True")
+    response = client.get("/daily-puzzle/ABCDEF/2024-03-05?testing=True")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -160,13 +161,13 @@ def test_get_daily_puzzle_valid_date():
     }
 
 def test_get_daily_puzzle_invalid_date_format():
-    response = client.get("/daily-puzzle/05-03-2024?testing=True")
+    response = client.get("/daily-puzzle/ABCDEF/05-03-2024?testing=True")
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid date format. Use YYYY-MM-DD."
 
 def test_get_daily_puzzle_not_found():
-    response = client.get("/daily-puzzle/2024-03-06?testing=True")
+    response = client.get("/daily-puzzle/ABCDEF/2024-03-06?testing=True")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No puzzle available"
@@ -176,16 +177,18 @@ def test_get_user_files_success():
         "owner": "testuser",
         "content": "def add(x, y):\nreturn x + y",
         "name": "file1",
-        "purpose": "daily puzzle"
+        "purpose": "daily puzzle",
+        "room": "ABCDEF"
     })
     mock_collection.insert_one({
         "owner": "testuser",
         "content": "x = 123",
         "name": "file2",
-        "purpose": "playground"
+        "purpose": "playground",
+        "room": "ABCDEF"
     })
 
-    response = client.get("/user-files/testuser?testing=True")
+    response = client.get("/user-files/ABCDEF/testuser?testing=True")
 
     assert response.status_code == 200
     files = response.json()["files"]
@@ -195,7 +198,7 @@ def test_get_user_files_success():
     assert files[1]["purpose"] == "playground"
 
 def test_get_user_files_empty():
-    response = client.get("/user-files/nonexistentuser?testing=True")
+    response = client.get("/user-files/ABCDEF/nonexistentuser?testing=True")
 
     assert response.status_code == 200
     assert len(response.json()["files"]) == 0
@@ -204,14 +207,15 @@ def test_get_user_files_empty():
 async def test_upload_user_files():
     file_data = UserFileList(
         files=[UserFile(owner="testuser", content="def add(x, y):\n    return x + y", name="file1", purpose="daily puzzle"),
-               UserFile(owner="testuser", content="x = 123", name="file2", purpose="playground")]
+               UserFile(owner="testuser", content="x = 123", name="file2", purpose="playground")],
+        room="ABCDEF"
     )
 
     response = client.post("/upload-files", json=file_data.model_dump(), params={"testing": "True"})
 
     assert response.status_code == 200
     assert response.json()["message"] == "Successfully updated 0 files, inserted 2 new files."
-    assert mock_collection.count_documents({"owner": "testuser"}) == 2
+    assert mock_collection.count_documents({"owner": "testuser", "room": "ABCDEF"}) == 2
 
 @pytest.mark.asyncio
 async def test_upload_user_files_update():
@@ -219,11 +223,13 @@ async def test_upload_user_files_update():
         "owner": "testuser",
         "content": "old content",
         "name": "file1",
-        "purpose": "purpose"
+        "purpose": "purpose",
+        "room": "ABCDEF"
     })
     
     updated_file_data = UserFileList(
-        files=[UserFile(owner="testuser", content="new content", name="file1", purpose="purpose")]
+        files=[UserFile(owner="testuser", content="new content", name="file1", purpose="purpose")],
+        room="ABCDEF"
     )
 
     response = client.post("/upload-files", json=updated_file_data.model_dump(), params={"testing": "True"})
@@ -232,11 +238,11 @@ async def test_upload_user_files_update():
     assert "updated 1" in response.json()["message"]
     assert "inserted 0" in response.json()["message"]
 
-    updated_file = mock_collection.find_one({"owner": "testuser", "name": "file1"})
+    updated_file = mock_collection.find_one({"owner": "testuser", "room": "ABCDEF", "name": "file1"})
     
     assert updated_file is not None
     assert updated_file["content"] == "new content"
-    assert mock_collection.count_documents({"owner": "testuser", "name": "file1"}) == 1
+    assert mock_collection.count_documents({"owner": "testuser", "room": "ABCDEF", "name": "file1"}) == 1
 
 def test_get_lectures_success():
     mock_collection.insert_one({
@@ -245,7 +251,8 @@ def test_get_lectures_success():
         "slides": [{"name": "slide1", "content": "Content of slide 1"}],
         "quiz": [{"question": "What is 2+2?", "answer": "4", "options": ["3", "4", "5", "6"]}],
         "required": [],
-        "passmark" : 50
+        "passmark" : 50,
+        "room": "ABCDEF"
     })
     mock_collection.insert_one({
         "difficulty": "easy",
@@ -253,10 +260,11 @@ def test_get_lectures_success():
         "slides": [{"name": "slide1", "content": "Content of slide 1"}],
         "quiz": [{"question": "What is a list?", "answer": "A collection", "options": ["A number", "A collection", "A string"]}],
         "required": ["Intro to Python"],
-        "passmark" : 100
+        "passmark" : 100,
+        "room": "ABCDEF"
     })
 
-    response = client.get("/lectures/easy?testing=True")
+    response = client.get("/lectures/ABCDEF/easy?testing=True")
 
     assert response.status_code == 200
     lectures = response.json()["lectures"]
@@ -271,7 +279,7 @@ def test_get_lectures_success():
     assert len(lectures[1]["required"]) == 1
 
 def test_get_lectures_no_matches():
-    response = client.get("/lectures/advanced?testing=True")
+    response = client.get("/lectures/ABCDEF/advanced?testing=True")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No lectures found for the given difficulty."
@@ -309,10 +317,11 @@ def test_get_guided_projects_success():
             "Use the `input()` function to get the user's name.",
             "Make sure to call the function `greet_user()` to execute the greeting."
         ],
-        "solution": "def greet_user():\n    name = input('What is your name? ')\n    print('Hello, ' + name + '!')\n\ngreet_user()"
+        "solution": "def greet_user():\n    name = input('What is your name? ')\n    print('Hello, ' + name + '!')\n\ngreet_user()",
+        "room": "ABCDEF"
     })
 
-    response = client.get("/guided-projects?testing=True")
+    response = client.get("/guided-projects/ABCDEF?testing=True")
 
     assert response.status_code == 200
     guided_projects = response.json()["guidedProjects"]
@@ -327,7 +336,7 @@ def test_get_guided_projects_success():
     assert len(steps[0]["options"]) == 3
     
 def test_get_guided_projects_not_found():
-    response = client.get("/guided-projects?testing=True")
+    response = client.get("/guided-projects/ABCDEF?testing=True")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No guided projects found."
@@ -339,10 +348,11 @@ def test_get_user_data_success():
             "lectures": ["Intro 1"],
             "projects": [],
             "puzzles": ["2025-03-10", "2025-03-12"]
-        }
+        },
+        "room": "ABCDEF"
     })
 
-    response = client.get("/user-data/testuser?testing=True")
+    response = client.get("/user-data/testuser/ABCDEF?testing=True")
 
     assert response.status_code == 200
     user_data = response.json()
@@ -351,10 +361,10 @@ def test_get_user_data_success():
     assert len(user_data["completions"]["puzzles"]) == 2
 
 def test_get_user_data_not_found():
-    response = client.get("/user-data/nonexistinguser?testing=True")
+    response = client.get("/user-data/nonexistinguser/ABCDEF?testing=True")
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "No user data found -> problem :("
+    assert response.json()["detail"] == "No user data found"
 
 def test_get_user_data_many():
     mock_collection.insert_one({
@@ -363,7 +373,8 @@ def test_get_user_data_many():
             "lectures": ["Intro 1"],
             "projects": [],
             "puzzles": ["2025-03-10", "2025-03-12"]
-        }
+        },
+        "room": "ABCDEF"
     })
     mock_collection.insert_one({
         "username": "testuserduplicate",
@@ -371,10 +382,11 @@ def test_get_user_data_many():
             "lectures": [],
             "projects": ["First Proj"],
             "puzzles": ["2025-03-12"]
-        }
+        },
+        "room": "ABCDEF"
     })
 
-    response = client.get("/user-data/testuserduplicate?testing=True")
+    response = client.get("/user-data/testuserduplicate/ABCDEF?testing=True")
 
     assert response.status_code == 409
     assert response.json()["detail"] == "More than one user data found -> problem :("
@@ -386,7 +398,8 @@ def test_create_user_data():
             lectures=[],
             projects=[],
             puzzles=[]
-        )
+        ),
+        room="ABCDEF"
     )
 
     response = client.post("/user-data", json=user_data.model_dump(), params={"testing": "True"})
@@ -394,7 +407,7 @@ def test_create_user_data():
     assert response.status_code == 200
     assert response.json()["message"] == "User data created successfully"
 
-    created_data_count = mock_collection.count_documents({"username": "testuser"})
+    created_data_count = mock_collection.count_documents({"username": "testuser", "room": "ABCDEF"})
     assert created_data_count == 1
 
 def test_update_user_data():
@@ -404,7 +417,8 @@ def test_update_user_data():
             "lectures": [],
             "projects": ["a"],
             "puzzles": []
-        }
+        },
+        "room": "ABCDEF"
     })
 
     user_data = UserData(
@@ -413,7 +427,8 @@ def test_update_user_data():
             lectures=["Intro 1"],
             projects=["a", "b", "c"],
             puzzles=["2025-03-10", "2025-03-12"]
-        )
+        ),
+        room="ABCDEF"
     )
 
     response = client.post("/user-data", json=user_data.model_dump(), params={"testing": "True"})
@@ -421,10 +436,10 @@ def test_update_user_data():
     assert response.status_code == 200
     assert response.json()["message"] == "User data updated successfully"
 
-    user_data_count = mock_collection.count_documents({"username": "testuser"})
+    user_data_count = mock_collection.count_documents({"username": "testuser", "room": "ABCDEF"})
     assert user_data_count == 1
 
-    updated_user_data = mock_collection.find_one({"username": "testuser"})
+    updated_user_data = mock_collection.find_one({"username": "testuser", "room": "ABCDEF"})
     assert len(updated_user_data["completions"]["projects"]) == 3
     assert updated_user_data["completions"]["puzzles"][1] == "2025-03-12"
 
@@ -435,10 +450,12 @@ def test_update_lecture_completion():
             "lectures": ["Existing Lecture"],
             "projects": [],
             "puzzles": []
-        }
+        },
+        "room":"ABCDEF"
     })
     new_lecture_request = LectureCompletionRequest(
         username="testuser",
+        room="ABCDEF",
         lecture="New Lecture"
     )
 
@@ -458,11 +475,13 @@ def test_update_project_completion():
             "lectures": [],
             "projects": ["Existing Project"],
             "puzzles": []
-        }
+        },
+        "room":"ABCDEF"
     })
 
     new_project_request = ProjectCompletionRequest(
         username="testuser",
+        room="ABCDEF",
         project="New Project"
     )
 
@@ -482,11 +501,13 @@ def test_update_puzzle_completion():
             "lectures": [],
             "projects": [],
             "puzzles": ["2025-03-10"]
-        }
+        },
+        "room":"ABCDEF"
     })
 
     new_puzzle_request = PuzzleCompletionRequest(
         username="testuser",
+        room="ABCDEF",
         puzzle="2025-03-12"
     )
 
@@ -506,11 +527,13 @@ def test_update_lecture_completion_no_changes():
             "lectures": ["Same Lecture"],
             "projects": [],
             "puzzles": []
-        }
+        },
+        "room":"ABCDEF"
     })
 
     new_lecture_request = LectureCompletionRequest(
         username="testuser",
+        room="ABCDEF",
         lecture="Same Lecture"
     )
 
@@ -529,11 +552,13 @@ def test_update_project_completion_no_changes():
             "lectures": [],
             "projects": ["Same Project"],
             "puzzles": []
-        }
+        },
+        "room":"ABCDEF"
     })
 
     new_project_request = ProjectCompletionRequest(
         username="testuser",
+        room="ABCDEF",
         project="Same Project"
     )
 
@@ -552,11 +577,13 @@ def test_update_puzzle_completion_no_changes():
             "lectures": [],
             "projects": [],
             "puzzles": ["2025-03-10"]
-        }
+        },
+        "room":"ABCDEF"
     })
 
     new_puzzle_request = PuzzleCompletionRequest(
         username="testuser",
+        room="ABCDEF",
         puzzle="2025-03-10"
     )
 
