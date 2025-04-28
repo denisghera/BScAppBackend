@@ -799,3 +799,26 @@ def test_get_no_rooms():
 
     assert response.status_code == 200
     assert len(response.json()["rooms"]) == 0
+
+def test_delete_no_room():
+    response = client.delete("/delete-room/ABCDEF?testing=True")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Room not found"
+
+def test_delete_room():
+    mock_collection.insert_one({
+        "owner": "testtutor", 
+        "name": "testroom", 
+        "capacity": 2,
+        "code": "ABCDEF"
+    })
+
+    count = mock_collection.count_documents({"code": "ABCDEF"})
+    assert count == 1
+
+    response = client.delete("/delete-room/ABCDEF?testing=True")
+    
+    assert response.status_code == 200
+    count = mock_collection.count_documents({"code": "ABCDEF"})
+    assert count == 0

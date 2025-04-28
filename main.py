@@ -463,6 +463,17 @@ def get_room_by_code(code: str, testing: bool = False):
 
     return room
 
+@app.delete("/delete-room/{code}")
+def delete_room_by_code(code: str, testing: bool = False):
+    collection = get_classroom_data_collection(testing)
+
+    result = collection.delete_one({"code": code})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    return {"message": "Room deleted successfully"}
+
 @app.get("/")
 def home():
     return {"message": "FastAPI MongoDB Backend is Running!"}
