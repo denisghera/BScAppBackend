@@ -104,7 +104,7 @@ def refresh_token(refresh_token: str):
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
-        # Check that this refresh token is still valid (optional: store in DB)
+        # Check that this refresh token is still valid
         new_access_token = create_access_token(username)
         return {"access_token": new_access_token, "token_type": "bearer"}
     except JWTError:
