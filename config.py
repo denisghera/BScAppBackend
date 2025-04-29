@@ -29,6 +29,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
+DANGEROUS_MODULES = {"os", "sys", "shutil", "subprocess", "socket", "ctypes"}
+
 # Email Configuration
 conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("MAIL_USERNAME"),

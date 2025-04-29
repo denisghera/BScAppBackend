@@ -2,6 +2,7 @@ import bcrypt
 import secrets
 import string
 import re
+import ast
 from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi_mail import FastMail, MessageSchema
@@ -42,6 +43,21 @@ async def send_verification_email(email: str, token: str, type: str):
 
     fm = FastMail(conf)
     await fm.send_message(message)
+
+def is_safe_code(code: str) -> bool:
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.split('.')[0] in DANGEROUS_MODULES:
+                        return False
+            elif isinstance(node, ast.ImportFrom):
+                if node.module and node.module.split('.')[0] in DANGEROUS_MODULES:
+                    return False
+    except Exception:
+        return False
+    return True
 
 def extract_error_message(error_text):
     match = re.search(r"(\w*Error):\s*(.*)", error_text)

@@ -61,3 +61,26 @@ def test_invalid_token_type_rejected():
         assert decoded["type"] == "access", "Token type should be access"
     except AssertionError:
         pass  # Test passes if this fails
+
+def test_safe_code():
+    code = """
+def add(a, b):
+    return a + b
+
+print(add(2, 3))
+"""
+    assert is_safe_code(code) == True
+
+def test_unsafe_import_os():
+    code = """
+import os
+print(os.listdir("."))
+"""
+    assert is_safe_code(code) == False
+
+def test_unsafe_import_from():
+    code = """
+from subprocess import run
+run(["ls"])
+"""
+    assert is_safe_code(code) == False

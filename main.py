@@ -330,12 +330,15 @@ def update_puzzle_completion(request: PuzzleCompletionRequest, testing: bool = F
 
 @app.post("/execute-code")
 def execute_code(request: CodeRequest):
-    temp_file = f"temp_script_{uuid.uuid4().hex}.py"
+    if not is_safe_code(request.code):
+        return {"status": "error", "message": "Code contains disallowed imports"}
+    
+    temp_file = f"temp/temp_script_{uuid.uuid4().hex}.py"
     try:
         with open(temp_file, "w") as f:
             f.write(request.code)
         
-        result = subprocess.run(["python", temp_file], capture_output=True, text=True)
+        result = subprocess.run(["python", temp_file], capture_output=True, text=True, timeout=10)
 
         if result.returncode != 0:
             clean_error = extract_error_message(result.stderr)
