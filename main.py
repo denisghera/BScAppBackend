@@ -76,7 +76,14 @@ def login_user(user: UserLogin, testing: bool = False):
     if not dbUser.get("verified", True):
         raise HTTPException(status_code=400, detail="Email not verified. Please check your inbox.")
     
-    return {"message": "Login successful!"}
+    access_token = create_access_token(dbUser["username"])
+    refresh_token = create_refresh_token(dbUser["username"])
+    return {
+      "message": "Login successful!",
+      "access_token": access_token,
+      "refresh_token": refresh_token,
+      "token_type": "bearer"
+    }
 
 @app.get("/verify/{token}")
 def verify_email(token: str, testing: bool = False):
@@ -89,8 +96,19 @@ def verify_email(token: str, testing: bool = False):
 
     return {"message": "Email verified successfully! You can now log in."}
 
+@app.post("/refresh")
+def refresh_token(refresh_token: str):
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        # Check that this refresh token is still valid (optional: store in DB)
+        new_access_token = create_access_token(username)
+        return {"access_token": new_access_token, "token_type": "bearer"}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
 @app.get("/daily-puzzle/{room}/{date}")
-def get_daily_puzzle(room: str, date: str, testing: bool = False):
+def get_daily_puzzle(room: str, date: str, testing: bool = False, _: str = Depends(verify_token)):
     try:
         datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
@@ -105,8 +123,11 @@ def get_daily_puzzle(room: str, date: str, testing: bool = False):
     return {"name" : puzzle["name"], "description" : puzzle["description"], "tests" : puzzle["tests"]}
 
 @app.get("/user-files/{room}/{username}")
-def get_user_files(room: str, username: str, testing: bool = False):
+def get_user_files(room: str, username: str, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_file_collection(testing)
+    
+    if username != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's files")
     
     files_cursor = collection.find(
         {"room" : room, "owner" : username},
@@ -118,12 +139,15 @@ def get_user_files(room: str, username: str, testing: bool = False):
     return {"files": files}
 
 @app.post("/upload-files")
-async def upload_user_files(fileList: UserFileList, testing: bool = False):
+async def upload_user_files(fileList: UserFileList, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_file_collection(testing)
     
     operations = []
     
     for file in fileList.files:
+        # Skip files that are mistakenly/maliciously of another user's
+        if file.owner != current_user:
+            continue
         operations.append(
             UpdateOne(
                 {"owner": file.owner, "room": fileList.room, "name": file.name, "purpose": file.purpose},
@@ -142,7 +166,7 @@ async def upload_user_files(fileList: UserFileList, testing: bool = False):
     }
 
 @app.get("/lectures/{room}/{difficulty}")
-def get_lectures(room: str, difficulty: str, testing: bool = False):
+def get_lectures(room: str, difficulty: str, testing: bool = False, _: str = Depends(verify_token)):
     collection = get_lecture_collection(testing)
     
     count = collection.count_documents({"room": room, "difficulty": difficulty})
@@ -180,7 +204,7 @@ def get_lectures(room: str, difficulty: str, testing: bool = False):
     return {"lectures": lectures}
 
 @app.get("/guided-projects/{room}")
-def get_guided_projects(room: str, testing: bool = False):
+def get_guided_projects(room: str, testing: bool = False, _: str = Depends(verify_token)):
     collection = get_guided_projects_collection(testing)
 
     count = collection.count_documents({"room": room})
@@ -214,8 +238,11 @@ def get_guided_projects(room: str, testing: bool = False):
     return {"guidedProjects": guided_projects}
 
 @app.get("/user-data/{username}/{room}")
-def get_user_data(username: str, room: str, testing: bool = False):
+def get_user_data(username: str, room: str, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_data_collection(testing)
+
+    if username != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's data")
 
     count = collection.count_documents({"username" : username, "room": room})
 
@@ -238,8 +265,11 @@ def get_user_data(username: str, room: str, testing: bool = False):
     return user_data
 
 @app.post("/user-data")
-def create_or_update_user_data(user_data: UserData, testing: bool = False):
+def create_or_update_user_data(user_data: UserData, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_data_collection(testing)
+
+    if user_data.username != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's data")
 
     result = collection.update_one(
         {"username": user_data.username, "room": user_data.room},
@@ -257,8 +287,11 @@ def create_or_update_user_data(user_data: UserData, testing: bool = False):
         return {"message": "User data created successfully"}
 
 @app.post("/update-lecture-completion")
-def update_lecture_completion(request: LectureCompletionRequest, testing: bool = False):
+def update_lecture_completion(request: LectureCompletionRequest, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_data_collection(testing)
+
+    if request.username != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's data")
 
     result = collection.update_one(
         {"username": request.username, "room": request.room},
@@ -268,8 +301,11 @@ def update_lecture_completion(request: LectureCompletionRequest, testing: bool =
     return {"message": "Lectures completion updated successfully"} if result.modified_count else {"message": "No changes made"}
 
 @app.post("/update-project-completion")
-def update_project_completion(request: ProjectCompletionRequest, testing: bool = False):
+def update_project_completion(request: ProjectCompletionRequest, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_data_collection(testing)
+
+    if request.username != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's data")
 
     result = collection.update_one(
         {"username": request.username, "room": request.room},
@@ -279,9 +315,12 @@ def update_project_completion(request: ProjectCompletionRequest, testing: bool =
     return {"message": "Projects completion updated successfully"} if result.modified_count else {"message": "No changes made"}
 
 @app.post("/update-puzzle-completion")
-def update_puzzle_completion(request: PuzzleCompletionRequest, testing: bool = False):
+def update_puzzle_completion(request: PuzzleCompletionRequest, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_data_collection(testing)
 
+    if request.username != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's data")
+    
     result = collection.update_one(
         {"username": request.username, "room": request.room},
         {"$addToSet": {"completions.puzzles": request.puzzle}}
@@ -357,7 +396,14 @@ def login_tutor(tutor: UserLogin, testing: bool = False):
     if not dbTutor.get("approved", True):
         raise HTTPException(status_code=400, detail="Account not approved yet. Please wait until notified or contact an admin.")
     
-    return {"message": "Login successful!"}
+    access_token = create_access_token(dbTutor["username"])
+    refresh_token = create_refresh_token(dbTutor["username"])
+    return {
+      "message": "Login successful!",
+      "access_token": access_token,
+      "refresh_token": refresh_token,
+      "token_type": "bearer"
+    }
 
 @app.get("/verify-tutor/{token}")
 def verify_tutor_email(token: str, testing: bool = False):
@@ -371,8 +417,11 @@ def verify_tutor_email(token: str, testing: bool = False):
     return {"message": "Email verified successfully! Please wait for approval notification or contact an admin."}
 
 @app.post("/create-room")
-def create_room(request: RoomData, testing: bool = False):
+def create_room(request: RoomData, testing: bool = False, current_tutor: str = Depends(verify_tutor_token)):
     collection = get_classroom_data_collection(testing)
+
+    if request.owner != current_tutor:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another tutor's rooms")
 
     count = collection.count_documents({"owner" : request.owner})
 
@@ -402,9 +451,12 @@ def create_room(request: RoomData, testing: bool = False):
     return {"message": "Classroom created with success!", "code": access_code}
 
 @app.get("/rooms/{owner}")
-def get_rooms(owner: str, testing: bool = False):
+def get_rooms(owner: str, testing: bool = False, current_tutor: str = Depends(verify_tutor_token)):
     collection = get_classroom_data_collection(testing)
 
+    if owner != current_tutor:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another tutor's rooms")
+    
     rooms_cursor = collection.find(
         {"owner": owner},
         {"_id": 0}
@@ -415,7 +467,7 @@ def get_rooms(owner: str, testing: bool = False):
     return {"rooms": rooms}
 
 @app.get("/room/{code}")
-def get_room_by_code(code: str, testing: bool = False):
+def get_room_by_code(code: str, testing: bool = False, _: str = Depends(verify_token)):
     collection = get_classroom_data_collection(testing)
 
     room = collection.find_one(
@@ -429,13 +481,17 @@ def get_room_by_code(code: str, testing: bool = False):
     return room
 
 @app.delete("/delete-room/{code}")
-def delete_room_by_code(code: str, testing: bool = False):
+def delete_room_by_code(code: str, testing: bool = False, current_tutor: str = Depends(verify_tutor_token)):
     collection = get_classroom_data_collection(testing)
 
-    result = collection.delete_one({"code": code})
-
-    if result.deleted_count == 0:
+    room = collection.find_one({"code": code})
+    if not room:
         raise HTTPException(status_code=404, detail="Room not found")
+    
+    if room.get("owner") != current_tutor:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another tutor's rooms")
+
+    collection.delete_one({"code": code})
     
     return {"message": "Room deleted successfully"}
 

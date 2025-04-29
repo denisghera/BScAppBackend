@@ -24,7 +24,10 @@ tutor_credentials_collection: Collection = db["tutor_credentials"]
 
 mock_collection: Collection = db["test_collection"]
 
-SESSION_TIMEOUT = timedelta(minutes=10)
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 # Email Configuration
 conf = ConnectionConfig(

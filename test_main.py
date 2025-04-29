@@ -2,10 +2,17 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app
 from config import mock_collection
-from utils import hash_password
+from utils import hash_password, create_access_token
 from models import *
-
 client = TestClient(app)
+
+@pytest.fixture(scope="session")
+def auth_token():
+    return create_access_token("testuser")
+
+@pytest.fixture(scope="session")
+def tutor_token():
+    return create_access_token("testtutor")
 
 @pytest.fixture(scope="function", autouse=True)
 def clean_db():
@@ -142,7 +149,7 @@ def test_valid_token():
     assert user["verified"] == True
     assert "token" not in user
 
-def test_get_daily_puzzle_valid_date():
+def test_get_daily_puzzle_valid_date(auth_token):
     mock_collection.insert_one({
         "date": "2024-03-05",
         "name": "Test Puzzle",
@@ -151,7 +158,8 @@ def test_get_daily_puzzle_valid_date():
         "room" : "ABCDEF"
     })
 
-    response = client.get("/daily-puzzle/ABCDEF/2024-03-05?testing=True")
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/daily-puzzle/ABCDEF/2024-03-05?testing=True", headers=headers)
 
     assert response.status_code == 200
     assert response.json() == {
@@ -160,19 +168,21 @@ def test_get_daily_puzzle_valid_date():
         "tests": ["add(2,5) == 7", "add(150,325) == 475"]
     }
 
-def test_get_daily_puzzle_invalid_date_format():
-    response = client.get("/daily-puzzle/ABCDEF/05-03-2024?testing=True")
+def test_get_daily_puzzle_invalid_date_format(auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/daily-puzzle/ABCDEF/05-03-2024?testing=True", headers=headers)
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid date format. Use YYYY-MM-DD."
 
-def test_get_daily_puzzle_not_found():
-    response = client.get("/daily-puzzle/ABCDEF/2024-03-06?testing=True")
+def test_get_daily_puzzle_not_found(auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/daily-puzzle/ABCDEF/2024-03-06?testing=True", headers=headers)
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No puzzle available"
 
-def test_get_user_files_success():
+def test_get_user_files_success(auth_token):
     mock_collection.insert_one({
         "owner": "testuser",
         "content": "def add(x, y):\nreturn x + y",
@@ -188,7 +198,8 @@ def test_get_user_files_success():
         "room": "ABCDEF"
     })
 
-    response = client.get("/user-files/ABCDEF/testuser?testing=True")
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/user-files/ABCDEF/testuser?testing=True", headers=headers)
 
     assert response.status_code == 200
     files = response.json()["files"]
@@ -197,28 +208,30 @@ def test_get_user_files_success():
     assert files[0]["name"] == "file1"
     assert files[1]["purpose"] == "playground"
 
-def test_get_user_files_empty():
-    response = client.get("/user-files/ABCDEF/nonexistentuser?testing=True")
+def test_get_user_files_empty(auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/user-files/ABCDEF/testuser?testing=True", headers=headers)
 
     assert response.status_code == 200
     assert len(response.json()["files"]) == 0
 
 @pytest.mark.asyncio
-async def test_upload_user_files():
+async def test_upload_user_files(auth_token):
     file_data = UserFileList(
         files=[UserFile(owner="testuser", content="def add(x, y):\n    return x + y", name="file1", purpose="daily puzzle"),
                UserFile(owner="testuser", content="x = 123", name="file2", purpose="playground")],
         room="ABCDEF"
     )
 
-    response = client.post("/upload-files", json=file_data.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/upload-files", json=file_data.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "Successfully updated 0 files, inserted 2 new files."
     assert mock_collection.count_documents({"owner": "testuser", "room": "ABCDEF"}) == 2
 
 @pytest.mark.asyncio
-async def test_upload_user_files_update():
+async def test_upload_user_files_update(auth_token):
     mock_collection.insert_one({
         "owner": "testuser",
         "content": "old content",
@@ -232,7 +245,8 @@ async def test_upload_user_files_update():
         room="ABCDEF"
     )
 
-    response = client.post("/upload-files", json=updated_file_data.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/upload-files", json=updated_file_data.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert "updated 1" in response.json()["message"]
@@ -244,7 +258,7 @@ async def test_upload_user_files_update():
     assert updated_file["content"] == "new content"
     assert mock_collection.count_documents({"owner": "testuser", "room": "ABCDEF", "name": "file1"}) == 1
 
-def test_get_lectures_success():
+def test_get_lectures_success(auth_token):
     mock_collection.insert_one({
         "difficulty": "easy",
         "title": "Intro to Python",
@@ -264,7 +278,8 @@ def test_get_lectures_success():
         "room": "ABCDEF"
     })
 
-    response = client.get("/lectures/ABCDEF/easy?testing=True")
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/lectures/ABCDEF/easy?testing=True", headers=headers)
 
     assert response.status_code == 200
     lectures = response.json()["lectures"]
@@ -278,13 +293,14 @@ def test_get_lectures_success():
     assert len(lectures[0]["required"]) == 0
     assert len(lectures[1]["required"]) == 1
 
-def test_get_lectures_no_matches():
-    response = client.get("/lectures/ABCDEF/advanced?testing=True")
+def test_get_lectures_no_matches(auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/lectures/ABCDEF/advanced?testing=True", headers=headers)
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No lectures found for the given difficulty."
 
-def test_get_guided_projects_success():
+def test_get_guided_projects_success(auth_token):
     mock_collection.insert_one({
         "name": "Simple Greeting Program",
         "description": "Write a Python program that asks for the user's name and then prints a greeting message.",
@@ -321,7 +337,8 @@ def test_get_guided_projects_success():
         "room": "ABCDEF"
     })
 
-    response = client.get("/guided-projects/ABCDEF?testing=True")
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/guided-projects/ABCDEF?testing=True", headers=headers)
 
     assert response.status_code == 200
     guided_projects = response.json()["guidedProjects"]
@@ -335,13 +352,14 @@ def test_get_guided_projects_success():
     assert len(steps) == 2
     assert len(steps[0]["options"]) == 3
     
-def test_get_guided_projects_not_found():
-    response = client.get("/guided-projects/ABCDEF?testing=True")
+def test_get_guided_projects_not_found(auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/guided-projects/ABCDEF?testing=True", headers=headers)
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No guided projects found."
 
-def test_get_user_data_success():
+def test_get_user_data_success(auth_token):
     mock_collection.insert_one({
         "username": "testuser",
         "completions": {
@@ -352,7 +370,8 @@ def test_get_user_data_success():
         "room": "ABCDEF"
     })
 
-    response = client.get("/user-data/testuser/ABCDEF?testing=True")
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/user-data/testuser/ABCDEF?testing=True", headers=headers)
 
     assert response.status_code == 200
     user_data = response.json()
@@ -360,15 +379,16 @@ def test_get_user_data_success():
     assert user_data["username"] == "testuser"
     assert len(user_data["completions"]["puzzles"]) == 2
 
-def test_get_user_data_not_found():
-    response = client.get("/user-data/nonexistinguser/ABCDEF?testing=True")
+def test_get_user_data_not_found(auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/user-data/testuser/ABCDEF?testing=True", headers=headers)
 
     assert response.status_code == 404
     assert response.json()["detail"] == "No user data found"
 
-def test_get_user_data_many():
+def test_get_user_data_many(auth_token):
     mock_collection.insert_one({
-        "username": "testuserduplicate",
+        "username": "testuser",
         "completions": {
             "lectures": ["Intro 1"],
             "projects": [],
@@ -377,7 +397,7 @@ def test_get_user_data_many():
         "room": "ABCDEF"
     })
     mock_collection.insert_one({
-        "username": "testuserduplicate",
+        "username": "testuser",
         "completions": {
             "lectures": [],
             "projects": ["First Proj"],
@@ -386,12 +406,13 @@ def test_get_user_data_many():
         "room": "ABCDEF"
     })
 
-    response = client.get("/user-data/testuserduplicate/ABCDEF?testing=True")
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/user-data/testuser/ABCDEF?testing=True", headers=headers)
 
     assert response.status_code == 409
     assert response.json()["detail"] == "More than one user data found -> problem :("
 
-def test_create_user_data():
+def test_create_user_data(auth_token):
     user_data = UserData(
         username="testuser",
         completions=CompletionData(
@@ -402,7 +423,8 @@ def test_create_user_data():
         room="ABCDEF"
     )
 
-    response = client.post("/user-data", json=user_data.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/user-data", json=user_data.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "User data created successfully"
@@ -410,7 +432,7 @@ def test_create_user_data():
     created_data_count = mock_collection.count_documents({"username": "testuser", "room": "ABCDEF"})
     assert created_data_count == 1
 
-def test_update_user_data():
+def test_update_user_data(auth_token):
     mock_collection.insert_one({
         "username": "testuser",
         "completions": {
@@ -431,7 +453,8 @@ def test_update_user_data():
         room="ABCDEF"
     )
 
-    response = client.post("/user-data", json=user_data.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/user-data", json=user_data.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "User data updated successfully"
@@ -443,7 +466,7 @@ def test_update_user_data():
     assert len(updated_user_data["completions"]["projects"]) == 3
     assert updated_user_data["completions"]["puzzles"][1] == "2025-03-12"
 
-def test_update_lecture_completion():
+def test_update_lecture_completion(auth_token):
     mock_collection.insert_one({
         "username": "testuser",
         "completions": {
@@ -459,7 +482,8 @@ def test_update_lecture_completion():
         lecture="New Lecture"
     )
 
-    response = client.post("/update-lecture-completion", json=new_lecture_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/update-lecture-completion", json=new_lecture_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "Lectures completion updated successfully"
@@ -468,7 +492,7 @@ def test_update_lecture_completion():
     assert "New Lecture" in user_data["completions"]["lectures"]
     assert len(user_data["completions"]["lectures"]) == 2
 
-def test_update_project_completion():
+def test_update_project_completion(auth_token):
     mock_collection.insert_one({
         "username": "testuser",
         "completions": {
@@ -485,7 +509,8 @@ def test_update_project_completion():
         project="New Project"
     )
 
-    response = client.post("/update-project-completion", json=new_project_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/update-project-completion", json=new_project_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "Projects completion updated successfully"
@@ -494,7 +519,7 @@ def test_update_project_completion():
     assert "New Project" in user_data["completions"]["projects"]
     assert len(user_data["completions"]["projects"]) == 2
 
-def test_update_puzzle_completion():
+def test_update_puzzle_completion(auth_token):
     mock_collection.insert_one({
         "username": "testuser",
         "completions": {
@@ -511,7 +536,8 @@ def test_update_puzzle_completion():
         puzzle="2025-03-12"
     )
 
-    response = client.post("/update-puzzle-completion", json=new_puzzle_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/update-puzzle-completion", json=new_puzzle_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "Puzzles completion updated successfully"
@@ -520,7 +546,7 @@ def test_update_puzzle_completion():
     assert "2025-03-12" in user_data["completions"]["puzzles"]
     assert len(user_data["completions"]["puzzles"]) == 2
 
-def test_update_lecture_completion_no_changes():
+def test_update_lecture_completion_no_changes(auth_token):
     mock_collection.insert_one({
         "username": "testuser",
         "completions": {
@@ -537,7 +563,8 @@ def test_update_lecture_completion_no_changes():
         lecture="Same Lecture"
     )
 
-    response = client.post("/update-lecture-completion", json=new_lecture_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/update-lecture-completion", json=new_lecture_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "No changes made"
@@ -545,7 +572,7 @@ def test_update_lecture_completion_no_changes():
     user_data = mock_collection.find_one({"username": "testuser"})
     assert len(user_data["completions"]["lectures"]) == 1
 
-def test_update_project_completion_no_changes():
+def test_update_project_completion_no_changes(auth_token):
     mock_collection.insert_one({
         "username": "testuser",
         "completions": {
@@ -562,7 +589,8 @@ def test_update_project_completion_no_changes():
         project="Same Project"
     )
 
-    response = client.post("/update-project-completion", json=new_project_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/update-project-completion", json=new_project_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "No changes made"
@@ -570,7 +598,7 @@ def test_update_project_completion_no_changes():
     user_data = mock_collection.find_one({"username": "testuser"})
     assert len(user_data["completions"]["projects"]) == 1
 
-def test_update_puzzle_completion_no_changes():
+def test_update_puzzle_completion_no_changes(auth_token):
     mock_collection.insert_one({
         "username": "testuser",
         "completions": {
@@ -587,7 +615,8 @@ def test_update_puzzle_completion_no_changes():
         puzzle="2025-03-10"
     )
 
-    response = client.post("/update-puzzle-completion", json=new_puzzle_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/update-puzzle-completion", json=new_puzzle_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["message"] == "No changes made"
@@ -615,7 +644,7 @@ def test_execute_code_unsuccessful():
 
     assert response.json()["status"] == "error"
 
-def test_create_classroom_duplicate_name():
+def test_create_classroom_duplicate_name(tutor_token):
     mock_collection.insert_one({
         "owner": "boss", 
         "name": "test-clasroom", 
@@ -623,32 +652,34 @@ def test_create_classroom_duplicate_name():
     })
     
     room_request = RoomData(
-        owner="test_owner",
+        owner="testtutor",
         name="test-clasroom",
         capacity=1
     )
 
-    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Name for classroom already taken"
 
-def test_create_classroom_duplicate_code():
+def test_create_classroom_duplicate_code(tutor_token):
     mock_collection.insert_one({
-        "owner": "boss", 
+        "owner": "testtutor", 
         "name": "test-clasroom", 
         "capacity": 3,
         "code": "ABC123"
     })
 
     room_request = RoomData(
-        owner="test_owner",
+        owner="testtutor",
         name="second-clasroom",
         capacity=1
     ) 
     # Default access code is hardcoded as ABC123 for testing in main function
 
-    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
 
@@ -658,14 +689,15 @@ def test_create_classroom_duplicate_code():
     assert count == 1
 
 
-def test_create_classroom_success():
+def test_create_classroom_success(tutor_token):
     room_request = RoomData(
-        owner="test_owner",
+        owner="testtutor",
         name="test-clasroom",
         capacity=1
     )
 
-    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"})
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-room", json=room_request.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 200
 
@@ -791,20 +823,21 @@ def test_login_tutor_success():
     assert response.status_code == 200
     assert response.json()["message"] == "Login successful!"
 
-def test_get_single_room():
+def test_get_single_room(tutor_token):
     mock_collection.insert_one({
         "owner": "testtutor", 
         "name": "testroom", 
         "capacity": 2
     })
 
-    response = client.get("/rooms/testtutor?testing=True")
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.get("/rooms/testtutor?testing=True", headers=headers)
 
     assert response.status_code == 200
     assert len(response.json()["rooms"]) == 1
     assert response.json()["rooms"][0]["name"] == "testroom"
 
-def test_get_multiple_rooms():
+def test_get_multiple_rooms(tutor_token):
     mock_collection.insert_one({
         "owner": "testtutor", 
         "name": "testroom", 
@@ -816,24 +849,27 @@ def test_get_multiple_rooms():
         "capacity": 4
     })
 
-    response = client.get("/rooms/testtutor?testing=True")
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.get("/rooms/testtutor?testing=True", headers=headers)
 
     assert response.status_code == 200
     assert len(response.json()["rooms"]) == 2
 
-def test_get_no_rooms():
-    response = client.get("/rooms/testtutor?testing=True")
+def test_get_no_rooms(tutor_token):
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.get("/rooms/testtutor?testing=True", headers=headers)
 
     assert response.status_code == 200
     assert len(response.json()["rooms"]) == 0
 
-def test_delete_no_room():
-    response = client.delete("/delete-room/ABCDEF?testing=True")
+def test_delete_no_room(tutor_token):
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.delete("/delete-room/ABCDEF?testing=True", headers=headers)
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Room not found"
 
-def test_delete_room():
+def test_delete_room(tutor_token):
     mock_collection.insert_one({
         "owner": "testtutor", 
         "name": "testroom", 
@@ -844,7 +880,8 @@ def test_delete_room():
     count = mock_collection.count_documents({"code": "ABCDEF"})
     assert count == 1
 
-    response = client.delete("/delete-room/ABCDEF?testing=True")
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.delete("/delete-room/ABCDEF?testing=True", headers=headers)
     
     assert response.status_code == 200
     count = mock_collection.count_documents({"code": "ABCDEF"})

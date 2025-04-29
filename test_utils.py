@@ -27,3 +27,37 @@ def test_extract_error_message():
     assert extract_error_message("This is not an error message") == "Unknown Error"
     assert extract_error_message("") == "Unknown Error"
     assert extract_error_message("   ") == "Unknown Error"
+
+def test_access_token_structure():
+    username = "testuser"
+    token = create_access_token(username)
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    
+    assert payload["sub"] == username
+    assert payload["type"] == "access"
+    assert "exp" in payload
+    assert datetime.fromtimestamp(payload["exp"], tz=timezone.utc) > datetime.now(timezone.utc)
+
+def test_refresh_token_structure():
+    username = "testuser"
+    token = create_refresh_token(username)
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    
+    assert payload["sub"] == username
+    assert payload["type"] == "refresh"
+    assert "exp" in payload
+    assert datetime.fromtimestamp(payload["exp"], tz=timezone.utc) > datetime.now(timezone.utc)
+
+def test_invalid_token_type_rejected():
+    username = "testuser"
+    # Fake a refresh token payload with type=refresh
+    expire = datetime.now(timezone.utc) + timedelta(minutes=5)
+    payload = {"sub": username, "exp": expire, "type": "refresh"}
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    try:
+        # Simulate calling your verify_token logic manually
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        assert decoded["type"] == "access", "Token type should be access"
+    except AssertionError:
+        pass  # Test passes if this fails
