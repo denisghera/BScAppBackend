@@ -70,6 +70,9 @@ def login_user(user: UserLogin, testing: bool = False):
     collection = get_user_credentials_collection(testing)
     dbUser = collection.find_one({"username": user.username})
     
+    if dbUser["username"] == "testuser":
+        raise HTTPException(status_code=400, detail="Cannot use the test user")
+    
     if not dbUser or not verify_password(user.password, dbUser["password"]):
         raise HTTPException(status_code=400, detail="Invalid username or password")
 
@@ -389,6 +392,9 @@ async def register_tutor(tutor: TutorRegister, testing: bool = False):
 def login_tutor(tutor: UserLogin, testing: bool = False):
     collection = get_tutor_credentials_collection(testing)
     dbTutor = collection.find_one({"username": tutor.username})
+
+    if dbTutor["username"] == "testtutor":
+        raise HTTPException(status_code=400, detail="Cannot use the test tutor")
     
     if not dbTutor or not verify_password(tutor.password, dbTutor["password"]):
         raise HTTPException(status_code=400, detail="Invalid username or password")
