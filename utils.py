@@ -33,7 +33,7 @@ async def send_verification_email(email: str, token: str, type: str):
         type_url = 'verify'
     elif type == 'tutor':
         type_url = 'verify-tutor'
-    verification_link = f"http://127.0.0.1:8000/{type_url}/{token}"
+    verification_link = f"https://bsc-app-backend.onrender.com/{type_url}/{token}"
     message = MessageSchema(
         subject="Verify Your Email",
         recipients=[email],
