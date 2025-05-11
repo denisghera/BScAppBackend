@@ -269,14 +269,14 @@ def get_user_data(username: str, room: str, testing: bool = False, current_user:
     return user_data
 
 @app.post("/user-data")
-def create_or_update_user_data(user_data: UserData, testing: bool = False, current_user: str = Depends(verify_token)):
+def create_user_data(user_data: UserData, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_data_collection(testing)
 
     if user_data.username != current_user:
         raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's data")
 
     result = collection.update_one(
-        {"username": user_data.username, "room": user_data.room, "level": user_data.level},
+        {"username": user_data.username, "room": user_data.room, "level": "easy"},
         {"$set": {
             "completions.lectures": user_data.completions.lectures,
             "completions.projects": user_data.completions.projects,
@@ -308,7 +308,7 @@ def update_lecture_completion(request: LectureCompletionRequest, testing: bool =
         # Get user document
         user = collection.find_one({"username": request.username, "room": request.room})
 
-        current_difficulty = user.get("difficulty", "easy")
+        current_difficulty = user.get("level", "easy")
         completed_lectures = user.get("completions", {}).get("lectures", [])
 
         lectures_in_difficulty = list(lectures_collection.find({
