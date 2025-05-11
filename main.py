@@ -70,7 +70,7 @@ def login_user(user: UserLogin, testing: bool = False):
     collection = get_user_credentials_collection(testing)
     dbUser = collection.find_one({"username": user.username})
     
-    if dbUser["username"] == "testuser":
+    if dbUser["username"] == "testuser" and not testing:
         raise HTTPException(status_code=400, detail="Cannot use the test user")
     
     if not dbUser or not verify_password(user.password, dbUser["password"]):
@@ -262,7 +262,8 @@ def get_user_data(username: str, room: str, testing: bool = False, current_user:
                 projects=user_data_cursor["completions"]["projects"],
                 puzzles=user_data_cursor["completions"]["puzzles"]
             ),
-            room=user_data_cursor.get("room")
+            room=user_data_cursor.get("room"),
+            level=user_data_cursor.get("level")
     )
 
     return user_data
@@ -275,7 +276,7 @@ def create_or_update_user_data(user_data: UserData, testing: bool = False, curre
         raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's data")
 
     result = collection.update_one(
-        {"username": user_data.username, "room": user_data.room},
+        {"username": user_data.username, "room": user_data.room, "level": user_data.level},
         {"$set": {
             "completions.lectures": user_data.completions.lectures,
             "completions.projects": user_data.completions.projects,
@@ -292,6 +293,7 @@ def create_or_update_user_data(user_data: UserData, testing: bool = False, curre
 @app.post("/update-lecture-completion")
 def update_lecture_completion(request: LectureCompletionRequest, testing: bool = False, current_user: str = Depends(verify_token)):
     collection = get_user_data_collection(testing)
+    lectures_collection = get_lecture_collection(testing)
 
     if request.username != current_user:
         raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's data")
@@ -300,6 +302,30 @@ def update_lecture_completion(request: LectureCompletionRequest, testing: bool =
         {"username": request.username, "room": request.room},
         {"$addToSet": {"completions.lectures": request.lecture}}
     )
+
+    # If update was successful, check for promotion
+    if result.modified_count:
+        # Get user document
+        user = collection.find_one({"username": request.username, "room": request.room})
+
+        current_difficulty = user.get("difficulty", "easy")
+        completed_lectures = user.get("completions", {}).get("lectures", [])
+
+        lectures_in_difficulty = list(lectures_collection.find({
+            "room": request.room,
+            "difficulty": current_difficulty
+        }))
+        lecture_titles = [lecture["title"] for lecture in lectures_in_difficulty]
+
+        # Check if all lectures in this difficulty are completed
+        if lecture_titles and all(title in completed_lectures for title in lecture_titles):
+            next_level = get_next_level(current_difficulty)
+            if next_level:
+                collection.update_one(
+                    {"username": request.username, "room": request.room},
+                    {"$set": {"level": next_level}}
+                )
+                return {"message": f"Promoted to {next_level} level"}
 
     return {"message": "Lectures completion updated successfully"} if result.modified_count else {"message": "No changes made"}
 
@@ -393,7 +419,7 @@ def login_tutor(tutor: UserLogin, testing: bool = False):
     collection = get_tutor_credentials_collection(testing)
     dbTutor = collection.find_one({"username": tutor.username})
 
-    if dbTutor["username"] == "testtutor":
+    if dbTutor["username"] == "testtutor" and not testing:
         raise HTTPException(status_code=400, detail="Cannot use the test tutor")
     
     if not dbTutor or not verify_password(tutor.password, dbTutor["password"]):

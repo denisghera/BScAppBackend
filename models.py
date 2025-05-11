@@ -70,6 +70,7 @@ class UserData(BaseModel):
     username: str
     room: str
     completions: CompletionData
+    level: str
 
 class LectureCompletionRequest(BaseModel):
     username: str

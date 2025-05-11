@@ -367,7 +367,8 @@ def test_get_user_data_success(auth_token):
             "projects": [],
             "puzzles": ["2025-03-10", "2025-03-12"]
         },
-        "room": "ABCDEF"
+        "room": "ABCDEF",
+        "level": "easy"
     })
 
     headers = {"Authorization": f"Bearer {auth_token}"}
@@ -394,7 +395,8 @@ def test_get_user_data_many(auth_token):
             "projects": [],
             "puzzles": ["2025-03-10", "2025-03-12"]
         },
-        "room": "ABCDEF"
+        "room": "ABCDEF",
+        "level": "easy"
     })
     mock_collection.insert_one({
         "username": "testuser",
@@ -403,7 +405,8 @@ def test_get_user_data_many(auth_token):
             "projects": ["First Proj"],
             "puzzles": ["2025-03-12"]
         },
-        "room": "ABCDEF"
+        "room": "ABCDEF",
+        "level": "easy"
     })
 
     headers = {"Authorization": f"Bearer {auth_token}"}
@@ -420,7 +423,8 @@ def test_create_user_data(auth_token):
             projects=[],
             puzzles=[]
         ),
-        room="ABCDEF"
+        room="ABCDEF",
+        level="easy"
     )
 
     headers = {"Authorization": f"Bearer {auth_token}"}
@@ -440,7 +444,8 @@ def test_update_user_data(auth_token):
             "projects": ["a"],
             "puzzles": []
         },
-        "room": "ABCDEF"
+        "room": "ABCDEF",
+        "level": "easy"
     })
 
     user_data = UserData(
@@ -450,7 +455,8 @@ def test_update_user_data(auth_token):
             projects=["a", "b", "c"],
             puzzles=["2025-03-10", "2025-03-12"]
         ),
-        room="ABCDEF"
+        room="ABCDEF",
+        level="easy"
     )
 
     headers = {"Authorization": f"Bearer {auth_token}"}

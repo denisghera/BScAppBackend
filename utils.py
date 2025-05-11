@@ -119,3 +119,11 @@ def verify_tutor_token(credentials: HTTPAuthorizationCredentials = Depends(beare
         raise HTTPException(status_code=401, detail="Tutor not found or not verified/approved")
 
     return username
+
+def get_next_level(current: str):
+    order = ["easy", "moderate", "advanced"]
+    try:
+        idx = order.index(current)
+        return order[idx + 1] if idx + 1 < len(order) else None
+    except ValueError:
+        return None
