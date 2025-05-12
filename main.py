@@ -358,10 +358,12 @@ def update_puzzle_completion(request: PuzzleCompletionRequest, testing: bool = F
     return {"message": "Puzzles completion updated successfully"} if result.modified_count else {"message": "No changes made"}
 
 @app.post("/execute-code")
-def execute_code(request: CodeRequest):
+def execute_code(request: CodeRequest, _: str = Depends(verify_token)):
     if not is_safe_code(request.code):
         return {"status": "error", "message": "Code contains disallowed imports"}
     
+    os.makedirs("temp", exist_ok=True)
+
     temp_file = f"temp/temp_script_{uuid.uuid4().hex}.py"
     try:
         with open(temp_file, "w") as f:

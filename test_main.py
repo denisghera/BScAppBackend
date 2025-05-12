@@ -498,6 +498,34 @@ def test_update_lecture_completion(auth_token):
     assert "New Lecture" in user_data["completions"]["lectures"]
     assert len(user_data["completions"]["lectures"]) == 2
 
+def test_update_lecture_completion_with_promotion(auth_token):
+    mock_collection.insert_one({
+        "username": "testuser",
+        "completions": {
+            "lectures": ["Existing Lecture"],
+            "projects": [],
+            "puzzles": []
+        },
+        "room":"ABCDEF",
+        "level":"moderate"
+    })
+    mock_collection.insert_one({
+        "difficulty": "moderate",
+        "title": "New Lecture",
+        "room":"ABCDEF"
+    })
+    new_lecture_request = LectureCompletionRequest(
+        username="testuser",
+        room="ABCDEF",
+        lecture="New Lecture"
+    )
+
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/update-lecture-completion", json=new_lecture_request.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Promoted to advanced level"
+
 def test_update_project_completion(auth_token):
     mock_collection.insert_one({
         "username": "testuser",

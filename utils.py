@@ -55,6 +55,15 @@ def is_safe_code(code: str) -> bool:
             elif isinstance(node, ast.ImportFrom):
                 if node.module and node.module.split('.')[0] in DANGEROUS_MODULES:
                     return False
+            elif isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name) and node.func.id in DANGEROUS_BUILTINS:
+                    return False
+                if isinstance(node.func, ast.Attribute):
+                    if isinstance(node.func.value, ast.Name) and node.func.attr in DANGEROUS_BUILTINS:
+                        return False
+            elif isinstance(node, ast.Name):
+                if node.id in DANGEROUS_BUILTINS:
+                    return False
     except Exception:
         return False
     return True

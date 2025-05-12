@@ -30,6 +30,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 DANGEROUS_MODULES = {"os", "sys", "shutil", "subprocess", "socket", "ctypes"}
+DANGEROUS_BUILTINS = {"eval", "exec", "compile", "open", "__import__", "input", "globals", "locals"}
 
 # Email Configuration
 conf = ConnectionConfig(
