@@ -70,10 +70,13 @@ def login_user(user: UserLogin, testing: bool = False):
     collection = get_user_credentials_collection(testing)
     dbUser = collection.find_one({"username": user.username})
     
+    if not dbUser:
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+    
     if dbUser["username"] == "testuser" and not testing:
         raise HTTPException(status_code=400, detail="Cannot use the test user")
     
-    if not dbUser or not verify_password(user.password, dbUser["password"]):
+    if not verify_password(user.password, dbUser["password"]):
         raise HTTPException(status_code=400, detail="Invalid username or password")
 
     if not dbUser.get("verified", True):

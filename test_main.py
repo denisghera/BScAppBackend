@@ -507,10 +507,10 @@ def test_update_lecture_completion_with_promotion(auth_token):
             "puzzles": []
         },
         "room":"ABCDEF",
-        "level":"moderate"
+        "level":"intermediate"
     })
     mock_collection.insert_one({
-        "difficulty": "moderate",
+        "difficulty": "intermediate",
         "title": "New Lecture",
         "room":"ABCDEF"
     })
@@ -658,11 +658,12 @@ def test_update_puzzle_completion_no_changes(auth_token):
     user_data = mock_collection.find_one({"username": "testuser"})
     assert len(user_data["completions"]["puzzles"]) == 1
 
-def test_execute_code_successful():
+def test_execute_code_successful(auth_token):
     code_request = CodeRequest(
         code="print(\"hello world\")"
     )
-    response = client.post("/execute-code", json=code_request.model_dump())
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/execute-code", json=code_request.model_dump(), headers=headers)
 
     assert response.status_code == 200
     assert response.json()["status"] == "success"
@@ -670,11 +671,12 @@ def test_execute_code_successful():
     assert "output" in response.json()
     assert response.json()["output"] == "hello world\n"
 
-def test_execute_code_unsuccessful():
+def test_execute_code_unsuccessful(auth_token):
     code_request = CodeRequest(
         code="badcode(abc)"
     )
-    response = client.post("/execute-code", json=code_request.model_dump())
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.post("/execute-code", json=code_request.model_dump(), headers=headers)
 
     assert response.json()["status"] == "error"
 

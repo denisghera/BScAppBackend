@@ -130,7 +130,7 @@ def verify_tutor_token(credentials: HTTPAuthorizationCredentials = Depends(beare
     return username
 
 def get_next_level(current: str):
-    order = ["easy", "moderate", "advanced"]
+    order = ["easy", "intermediate", "advanced"]
     try:
         idx = order.index(current)
         return order[idx + 1] if idx + 1 < len(order) else None
