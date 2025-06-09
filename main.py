@@ -424,10 +424,13 @@ def login_tutor(tutor: UserLogin, testing: bool = False):
     collection = get_tutor_credentials_collection(testing)
     dbTutor = collection.find_one({"username": tutor.username})
 
+    if not dbTutor:
+        raise HTTPException(status_code=400, detail="Invalid username or password")
+
     if dbTutor["username"] == "testtutor" and not testing:
         raise HTTPException(status_code=400, detail="Cannot use the test tutor")
     
-    if not dbTutor or not verify_password(tutor.password, dbTutor["password"]):
+    if not verify_password(tutor.password, dbTutor["password"]):
         raise HTTPException(status_code=400, detail="Invalid username or password")
 
     if not dbTutor.get("verified", True):
@@ -534,6 +537,30 @@ def delete_room_by_code(code: str, testing: bool = False, current_tutor: str = D
     collection.delete_one({"code": code})
     
     return {"message": "Room deleted successfully"}
+
+@app.get("/leaderboard/{room}")
+def get_leaderboard(room: str, testing: bool = False, _: str = Depends(verify_token)):
+    collection = get_user_data_collection(testing)
+
+    pipeline = [
+        {"$match": {"room": room}},
+        {"$project": {
+            "_id": 0,
+            "username": 1,
+            "score": {
+                "$add": [
+                    {"$multiply": [{"$size": {"$ifNull": ["$completions.lectures", []]}}, 5]},
+                    {"$multiply": [{"$size": {"$ifNull": ["$completions.puzzles", []]}}, 15]},
+                    {"$multiply": [{"$size": {"$ifNull": ["$completions.projects", []]}}, 30]}
+                ]
+            }
+        }},
+        {"$sort": {"score": -1}},
+        {"$limit": 5}
+    ]
+    leaderboard = list(collection.aggregate(pipeline))
+
+    return {"leaderboard": leaderboard}
 
 @app.get("/")
 def home():
