@@ -203,7 +203,8 @@ def get_lectures(room: str, difficulty: str, testing: bool = False, _: str = Dep
                 for quiz in lecture["quiz"]
             ],
             required=lecture["required"],
-            passmark=lecture["passmark"]
+            passmark=lecture["passmark"],
+            room=lecture["room"]
         )
         lectures.append(lecture_data)
     
@@ -237,7 +238,8 @@ def get_guided_projects(room: str, testing: bool = False, _: str = Depends(verif
                 for step in project['steps']
             ],
             hints=project['hints'],
-            solution=project['solution']
+            solution=project['solution'],
+            room=project['room']
         )
         guided_projects.append(guided_project)
 
@@ -561,6 +563,107 @@ def get_leaderboard(room: str, testing: bool = False, _: str = Depends(verify_to
     leaderboard = list(collection.aggregate(pipeline))
 
     return {"leaderboard": leaderboard}
+
+@app.post("/create-challenge")
+def create_challenge(challenge: ChallengeData, testing: bool = False, current_tutor: str = Depends(verify_tutor_token)):
+    collection = get_daily_puzzle_collection(testing)
+    classroom_date = get_classroom_data_collection(testing)
+
+    room = classroom_date.find_one({"code": challenge.room})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if room.get("owner") != current_tutor:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another tutor's rooms")
+
+    existing_challenge = collection.find_one({"date": challenge.date, "room": challenge.room})
+    if existing_challenge:
+        raise HTTPException(status_code=400, detail="Challenge for this date already exists")
+    
+    if not verify_valid_date(challenge.date):
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.") 
+
+    new_challenge = {
+        "date": challenge.date,
+        "name": challenge.name,
+        "description": challenge.description,
+        "tests": challenge.tests,
+        "room": challenge.room
+    }
+    
+    collection.insert_one(new_challenge)
+    
+    return {"message": "Challenge created successfully!"}
+
+@app.post("/create-lecture")
+def create_lecture(lecture: LectureData, testing: bool = False, current_tutor: str = Depends(verify_tutor_token)):
+    collection = get_lecture_collection(testing)
+    classroom_data = get_classroom_data_collection(testing)
+
+    room = classroom_data.find_one({"code": lecture.room})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if room.get("owner") != current_tutor:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another tutor's rooms")
+
+    existing_lecture = collection.find_one({"title": lecture.title, "room": lecture.room})
+    if existing_lecture:
+        raise HTTPException(status_code=400, detail="Lecture with this title already exists in the room")
+    
+    if lecture.difficulty not in ["easy", "intermediate", "advanced"]:
+        raise HTTPException(status_code=400, detail="Invalid difficulty level. Choose from easy, intermediate, or advanced.")
+
+    new_lecture = {
+        "title": lecture.title,
+        "difficulty": lecture.difficulty,
+        "slides": [slide.model_dump() for slide in lecture.slides],
+        "quiz": [quiz.model_dump() for quiz in lecture.quiz],
+        "required": lecture.required,
+        "passmark": lecture.passmark,
+        "room": lecture.room
+    }
+    
+    collection.insert_one(new_lecture)
+    
+    return {"message": "Lecture created successfully!"}
+
+@app.post("/create-project")
+def create_project(project: GuidedProjectData, testing: bool = False, current_tutor: str = Depends(verify_tutor_token)):
+    collection = get_guided_projects_collection(testing)
+    classroom_data = get_classroom_data_collection(testing)
+
+    room = classroom_data.find_one({"code": project.room})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if room.get("owner") != current_tutor:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another tutor's rooms")
+
+    existing_project = collection.find_one({"name": project.name, "room": project.room})
+    if existing_project:
+        raise HTTPException(status_code=400, detail="Project with this name already exists in the room")
+    
+    if project.difficulty not in ["easy", "intermediate", "advanced"]:
+        raise HTTPException(status_code=400, detail="Invalid difficulty level. Choose from easy, intermediate, or advanced.")
+    
+    for step in project.steps:
+        if step.code.count('___') != 1:
+            raise HTTPException(status_code=400, detail="Each step's code must contain exactly one '___' as placeholder.")
+
+    new_project = {
+        "name": project.name,
+        "description": project.description,
+        "difficulty": project.difficulty,
+        "steps": [step.model_dump() for step in project.steps],
+        "hints": project.hints,
+        "solution": project.solution,
+        "room": project.room
+    }
+    
+    collection.insert_one(new_project)
+    
+    return {"message": "Project created successfully!"}
 
 @app.get("/")
 def home():

@@ -9,9 +9,6 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
-
-class UsernameRequest(BaseModel):
-    username: str
     
 class UserFile(BaseModel):
     owner: str
@@ -39,9 +36,7 @@ class LectureData(BaseModel):
     quiz: List[QuizData]
     required: List[str]
     passmark: int
-
-class LectureList(BaseModel):
-    lectures: List[LectureData]
+    room: str
 
 class StepData(BaseModel):
     title: str
@@ -57,9 +52,7 @@ class GuidedProjectData(BaseModel):
     steps: List[StepData]
     hints: List[str]
     solution: str
-
-class GuidedProjectList(BaseModel):
-    guidedProjects: List[GuidedProjectData]
+    room: str
 
 class CompletionData(BaseModel):
     lectures: List[str]
@@ -101,3 +94,10 @@ class TutorRegister(BaseModel):
     email: str
     type: str
     institution: str
+
+class ChallengeData(BaseModel):
+    date: str
+    description: str
+    name: str
+    room: str
+    tests: List[str]

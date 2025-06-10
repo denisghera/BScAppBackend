@@ -136,3 +136,10 @@ def get_next_level(current: str):
         return order[idx + 1] if idx + 1 < len(order) else None
     except ValueError:
         return None
+    
+def verify_valid_date(date_str: str) -> bool:
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False

@@ -922,3 +922,289 @@ def test_delete_room(tutor_token):
     assert response.status_code == 200
     count = mock_collection.count_documents({"code": "ABCDEF"})
     assert count == 0
+
+def test_leaderboard_empty(auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/leaderboard/ABCDEF?testing=True", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == {"leaderboard": []}
+
+def test_leaderboard_success(auth_token):
+    mock_collection.insert_one({
+        "username": "testuser1",
+        "completions": {
+            "lectures": ["Lecture 1"],
+            "projects": ["Project 1"],
+            "puzzles": ["2025-03-10"]
+        },
+        "room": "ABCDEF",
+        "level": "easy"
+    })
+    mock_collection.insert_one({
+        "username": "testuser2",
+        "completions": {
+            "lectures": ["Lecture 1"],
+            "projects": [],
+            "puzzles": ["2025-03-12"]
+        },
+        "room": "ABCDEF",
+        "level": "intermediate"
+    })
+
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/leaderboard/ABCDEF?testing=True", headers=headers)
+
+    assert response.status_code == 200
+    leaderboard = response.json()["leaderboard"]
+    assert len(leaderboard) == 2
+    assert leaderboard[0]["username"] == "testuser1"
+    assert leaderboard[1]["username"] == "testuser2"
+
+def test_create_challenge_success(tutor_token):
+    mock_collection.insert_one({
+        "owner": "testtutor",
+        "name": "testroom",
+        "capacity": 10,
+        "code": "ABCDEF"
+    })
+    challenge_data = ChallengeData(
+        date="2024-03-05",
+        name="Test Challenge",
+        description="This is a test challenge",
+        room="ABCDEF",
+        tests=["add(2, 3) == 5", "add(10, 20) == 30"]
+    )
+
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-challenge", json=challenge_data.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Challenge created successfully!"
+
+    count = mock_collection.count_documents({"name": "Test Challenge", "room": "ABCDEF"})
+    assert count == 1
+
+def test_create_challenge_invalid_date(tutor_token):
+    mock_collection.insert_one({
+        "owner": "testtutor",
+        "name": "testroom",
+        "capacity": 10,
+        "code": "ABCDEF"
+    })
+    challenge_data = ChallengeData(
+        name="Test Challenge",
+        description="This is a test challenge",
+        room="ABCDEF",
+        date="invalid-date",
+        tests=["add(2, 3) == 5", "add(10, 20) == 30"]
+    )
+
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-challenge", json=challenge_data.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid date format. Use YYYY-MM-DD."
+
+def test_create_challenge_existing(tutor_token):
+    mock_collection.insert_one({
+        "owner": "testtutor",
+        "name": "testroom",
+        "capacity": 10,
+        "code": "ABCDEF"
+    })
+    mock_collection.insert_one({
+        "name": "Existing Challenge",
+        "description": "This is an existing challenge",
+        "room": "ABCDEF",
+        "date": "2024-03-05",
+        "tests": ["add(2, 3) == 5", "add(10, 20) == 30"]
+    })
+
+    challenge_data = ChallengeData(
+        name="new challenge",
+        description="This is a second description",
+        room="ABCDEF",
+        date="2024-03-05",
+        tests=["add(2, 3) == 5", "add(10, 20) == 30"]
+    )
+
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-challenge", json=challenge_data.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Challenge for this date already exists"
+
+def test_create_lecture_success(tutor_token):
+    mock_collection.insert_one({
+        "owner": "testtutor",
+        "name": "testroom",
+        "capacity": 10,
+        "code": "ABCDEF"
+    })
+    lecture_data = LectureData(
+        title="Test Lecture",
+        description="This is a test lecture",
+        room="ABCDEF",
+        difficulty="easy",
+        slides=[SlideData(name="slide1", content="Content of slide 1")],
+        quiz=[QuizData(question="What is 2+2?", answer="4", options=["3", "4", "5", "6"])],
+        required=[],
+        passmark=50
+    )
+
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-lecture", json=lecture_data.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Lecture created successfully!"
+
+    count = mock_collection.count_documents({"title": "Test Lecture", "room": "ABCDEF"})
+    assert count == 1
+
+def test_create_lecture_existing(tutor_token):
+    mock_collection.insert_one({
+        "owner": "testtutor",
+        "name": "testroom",
+        "capacity": 10,
+        "code": "ABCDEF"
+    })
+    mock_collection.insert_one({
+        "title": "Existing Lecture",
+        "room": "ABCDEF",
+        "difficulty": "easy",
+        "slides": [{"name": "slide1", "content": "Content of slide 1"}],
+        "quiz": [{"question": "What is 2+2?", "answer": "4", "options": ["3", "4", "5", "6"]}],
+        "required": [],
+        "passmark": 50
+    })
+
+    lecture_data = LectureData(
+        title="Existing Lecture",
+        room="ABCDEF",
+        difficulty="easy",
+        slides=[SlideData(name="slide1", content="Content of slide 1")],
+        quiz=[QuizData(question="What is 2+2?", answer="4", options=["3", "4", "5", "6"])],
+        required=[],
+        passmark=50
+    )
+
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-lecture", json=lecture_data.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Lecture with this title already exists in the room"
+
+def test_create_project_success(tutor_token):
+    mock_collection.insert_one({
+        "owner": "testtutor",
+        "name": "testroom",
+        "capacity": 10,
+        "code": "ABCDEF"
+    })
+    project_data = GuidedProjectData(
+        name="Test Project",
+        description="This is a test project",
+        room="ABCDEF",
+        difficulty="easy",
+        steps=[
+            StepData(
+                title="Step 1",
+                description="Description for step 1",
+                code="___",
+                options=["print('Hello World')", "print('Goodbye')"],
+                answer="print('Hello World')"
+            )
+        ],
+        hints=["Hint for step 1"],
+        solution="print('Hello World')"
+    )
+
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-project", json=project_data.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Project created successfully!"
+
+    count = mock_collection.count_documents({"name": "Test Project", "room": "ABCDEF"})
+    assert count == 1
+
+def test_create_project_existing(tutor_token):
+    mock_collection.insert_one({
+        "owner": "testtutor",
+        "name": "testroom",
+        "capacity": 10,
+        "code": "ABCDEF"
+    })
+    mock_collection.insert_one({
+        "name": "Existing Project",
+        "room": "ABCDEF",
+        "description": "This is an existing project",
+        "difficulty": "easy",
+        "steps": [
+            {
+                "title": "Step 1",
+                "description": "Description for step 1",
+                "code": "___",
+                "options": ["print('Hello World')", "print('Goodbye')"],
+                "answer": "print('Hello World')"
+            }
+        ],
+        "hints": ["Hint for step 1"],
+        "solution": "print('Hello World')"
+    })
+
+    project_data = GuidedProjectData(
+        name="Existing Project",
+        room="ABCDEF",
+        description="This is an existing project",
+        difficulty="easy",
+        steps=[
+            StepData(
+                title="Step 1",
+                description="Description for step 1",
+                code="___",
+                options=["print('Hello World')", "print('Goodbye')"],
+                answer="print('Hello World')"
+            )
+        ],
+        hints=["Hint for step 1"],
+        solution="print('Hello World')"
+    )
+
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-project", json=project_data.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Project with this name already exists in the room"
+
+def test_create_project_invalid_code(tutor_token):
+    mock_collection.insert_one({
+        "owner": "testtutor",
+        "name": "testroom",
+        "capacity": 10,
+        "code": "ABCDEF"
+    })
+    project_data = GuidedProjectData(
+        name="Invalid Code Project",
+        description="This project has invalid code",
+        room="ABCDEF",
+        difficulty="easy",
+        steps=[
+            StepData(
+                title="Step 1",
+                description="Description for step 1",
+                code="invalid code here",
+                options=["print('Hello World')", "print('Goodbye')"],
+                answer="print('Hello World')"
+            )
+        ],
+        hints=["Hint for step 1"],
+        solution="print('Hello World')"
+    )
+
+    headers = {"Authorization": f"Bearer {tutor_token}"}
+    response = client.post("/create-project", json=project_data.model_dump(), params={"testing": "True"}, headers=headers)
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Each step's code must contain exactly one '___' as placeholder."

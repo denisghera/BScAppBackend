@@ -84,3 +84,11 @@ from subprocess import run
 run(["ls"])
 """
     assert is_safe_code(code) == False
+
+def test_valid_date():
+    assert verify_valid_date("2025-02-29") == False  # Not a leap year
+    assert verify_valid_date("2024-02-29") == True   # Leap year
+    assert verify_valid_date("2025-13-01") == False  # Invalid month
+    assert verify_valid_date("2025-01-32") == False  # Invalid day
+    assert verify_valid_date("2025-01-01") == True   # Valid date
+    assert verify_valid_date("") == False
