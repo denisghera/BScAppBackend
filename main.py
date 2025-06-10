@@ -142,7 +142,7 @@ def get_user_files(room: str, username: str, testing: bool = False, current_user
     
     files = list(files_cursor)
     
-    return {"files": files}
+    return {"files": files, "room": room}
 
 @app.post("/upload-files")
 async def upload_user_files(fileList: UserFileList, testing: bool = False, current_user: str = Depends(verify_token)):
@@ -233,11 +233,11 @@ def get_guided_projects(room: str, testing: bool = False, _: str = Depends(verif
                     description=step['description'],
                     code=step['code'],
                     options=step['options'],
-                    answer=step['answer']
+                    answer=step['answer'],
+                    hint=step['hint']
                 )
                 for step in project['steps']
             ],
-            hints=project['hints'],
             solution=project['solution'],
             room=project['room']
         )
@@ -648,15 +648,14 @@ def create_project(project: GuidedProjectData, testing: bool = False, current_tu
         raise HTTPException(status_code=400, detail="Invalid difficulty level. Choose from easy, intermediate, or advanced.")
     
     for step in project.steps:
-        if step.code.count('___') != 1:
-            raise HTTPException(status_code=400, detail="Each step's code must contain exactly one '___' as placeholder.")
+        if step.code.count('____') != 1:
+            raise HTTPException(status_code=400, detail="Each step's code must contain exactly one '____' as placeholder.")
 
     new_project = {
         "name": project.name,
         "description": project.description,
         "difficulty": project.difficulty,
         "steps": [step.model_dump() for step in project.steps],
-        "hints": project.hints,
         "solution": project.solution,
         "room": project.room
     }
@@ -664,6 +663,32 @@ def create_project(project: GuidedProjectData, testing: bool = False, current_tu
     collection.insert_one(new_project)
     
     return {"message": "Project created successfully!"}
+
+@app.get("/inventory/{username}/{room}")
+def get_inventory(username: str, room: str, testing: bool = False, current_user: str = Depends(verify_token)):
+    collection = get_user_data_collection(testing)
+    projects_collection = get_guided_projects_collection(testing)
+
+    if username != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden: Cannot access another user's inventory")
+
+    user_data = collection.find_one({"username": username, "room": room}, {"_id": 0})
+
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User data not found")
+
+    completed_projects = user_data.get("completions", {}).get("projects", [])
+    if not completed_projects:
+        return {"items" : []}
+
+    inventory = []
+    for project_name in completed_projects:
+        project = projects_collection.find_one({"name": project_name, "room": room}, {"_id": 0, "name": 1, "solution": 1})
+        if project:
+            item = InventoryItem(name=project["name"], solution=project["solution"])
+            inventory.append(item)
+
+    return {"items" : inventory}
 
 @app.get("/")
 def home():

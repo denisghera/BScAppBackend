@@ -315,7 +315,8 @@ def test_get_guided_projects_success(auth_token):
                     "'John'",
                     "42"
                 ],
-                "answer": "input('What is your name? ')"
+                "answer": "input('What is your name? ')",
+                "hint": "Use input() to get user input."
             },
             {
                 "title": "Call the greet_user() function",
@@ -326,12 +327,9 @@ def test_get_guided_projects_success(auth_token):
                     "print('Hello World')",
                     "input('Press enter to continue')"
                 ],
-                "answer": "greet_user()"
+                "answer": "greet_user()",
+                "hint": "Call the function you just created."
             }
-        ],
-        "hints": [
-            "Use the `input()` function to get the user's name.",
-            "Make sure to call the function `greet_user()` to execute the greeting."
         ],
         "solution": "def greet_user():\n    name = input('What is your name? ')\n    print('Hello, ' + name + '!')\n\ngreet_user()",
         "room": "ABCDEF"
@@ -1111,12 +1109,12 @@ def test_create_project_success(tutor_token):
             StepData(
                 title="Step 1",
                 description="Description for step 1",
-                code="___",
+                code="____",
                 options=["print('Hello World')", "print('Goodbye')"],
-                answer="print('Hello World')"
+                answer="print('Hello World')",
+                hint="Hint for step 1"
             )
         ],
-        hints=["Hint for step 1"],
         solution="print('Hello World')"
     )
 
@@ -1145,7 +1143,7 @@ def test_create_project_existing(tutor_token):
             {
                 "title": "Step 1",
                 "description": "Description for step 1",
-                "code": "___",
+                "code": "____",
                 "options": ["print('Hello World')", "print('Goodbye')"],
                 "answer": "print('Hello World')"
             }
@@ -1163,12 +1161,12 @@ def test_create_project_existing(tutor_token):
             StepData(
                 title="Step 1",
                 description="Description for step 1",
-                code="___",
+                code="____",
                 options=["print('Hello World')", "print('Goodbye')"],
-                answer="print('Hello World')"
+                answer="print('Hello World')",
+                hint="Hint for step 1"
             )
         ],
-        hints=["Hint for step 1"],
         solution="print('Hello World')"
     )
 
@@ -1196,10 +1194,10 @@ def test_create_project_invalid_code(tutor_token):
                 description="Description for step 1",
                 code="invalid code here",
                 options=["print('Hello World')", "print('Goodbye')"],
-                answer="print('Hello World')"
+                answer="print('Hello World')",
+                hint="Hint for step 1"
             )
         ],
-        hints=["Hint for step 1"],
         solution="print('Hello World')"
     )
 
@@ -1207,4 +1205,80 @@ def test_create_project_invalid_code(tutor_token):
     response = client.post("/create-project", json=project_data.model_dump(), params={"testing": "True"}, headers=headers)
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Each step's code must contain exactly one '___' as placeholder."
+    assert response.json()["detail"] == "Each step's code must contain exactly one '____' as placeholder."
+    
+def test_get_inventory_success(auth_token):
+    mock_collection.insert_one({
+        "username": "testuser",
+        "room": "ABCDEF",
+        "completions": {
+            "lectures": [],
+            "projects": ["Project 1", "Project 2"],
+            "puzzles": []
+        }
+    })
+    mock_collection.insert_one({
+        "name": "Project 1",
+        "description": "Desc 1",
+        "difficulty": "easy",
+        "steps": [],
+        "solution": "print(1)",
+        "room": "ABCDEF"
+    })
+    mock_collection.insert_one({
+        "name": "Project 2",
+        "description": "Desc 2",
+        "difficulty": "easy",
+        "steps": [],
+        "solution": "print(2)",
+        "room": "ABCDEF"
+    })
+
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/inventory/testuser/ABCDEF?testing=True", headers=headers)
+    assert response.status_code == 200
+
+    inventory = response.json()["items"]
+    assert isinstance(inventory, list)
+
+    assert len(inventory) == 2
+
+def test_get_inventory_no_user_data(auth_token):
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/inventory/testuser/ABCDEF?testing=True", headers=headers)
+    assert response.status_code == 404
+
+def test_get_inventory_no_projects(auth_token):
+    mock_collection.insert_one({
+        "username": "testuser",
+        "room": "ABCDEF",
+        "completions": {
+            "lectures": [],
+            "projects": [],
+            "puzzles": []
+        }
+    })
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/inventory/testuser/ABCDEF?testing=True", headers=headers)
+    assert response.status_code == 200
+
+    inventory = response.json()["items"]
+
+    assert len(inventory) == 0
+
+def test_get_inventory_project_not_found(auth_token):
+    mock_collection.insert_one({
+        "username": "testuser",
+        "room": "ABCDEF",
+        "completions": {
+            "lectures": [],
+            "projects": ["Nonexistent Project"],
+            "puzzles": []
+        }
+    })
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    response = client.get("/inventory/testuser/ABCDEF?testing=True", headers=headers)
+
+    inventory = response.json()["items"]
+
+    assert len(inventory) == 0

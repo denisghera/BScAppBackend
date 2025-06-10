@@ -44,13 +44,13 @@ class StepData(BaseModel):
     code: str
     options: List[str]
     answer: str
+    hint: str
 
 class GuidedProjectData(BaseModel):
     name: str
     description: str
     difficulty: str
     steps: List[StepData]
-    hints: List[str]
     solution: str
     room: str
 
@@ -101,3 +101,7 @@ class ChallengeData(BaseModel):
     name: str
     room: str
     tests: List[str]
+
+class InventoryItem(BaseModel):
+    name: str
+    solution: str
