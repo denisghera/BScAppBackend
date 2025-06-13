@@ -105,3 +105,10 @@ class ChallengeData(BaseModel):
 class InventoryItem(BaseModel):
     name: str
     solution: str
+
+class LeaderboardEntry(BaseModel):
+    username: str
+    score: int
+
+class Leaderboard(BaseModel):
+    leaderboard: List[LeaderboardEntry]

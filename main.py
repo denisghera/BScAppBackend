@@ -552,17 +552,20 @@ def get_leaderboard(room: str, testing: bool = False, _: str = Depends(verify_to
             "score": {
                 "$add": [
                     {"$multiply": [{"$size": {"$ifNull": ["$completions.lectures", []]}}, 5]},
-                    {"$multiply": [{"$size": {"$ifNull": ["$completions.puzzles", []]}}, 15]},
-                    {"$multiply": [{"$size": {"$ifNull": ["$completions.projects", []]}}, 30]}
+                    {"$multiply": [{"$size": {"$ifNull": ["$completions.puzzles", []]}}, 20]},
+                    {"$multiply": [{"$size": {"$ifNull": ["$completions.projects", []]}}, 10]}
                 ]
             }
         }},
-        {"$sort": {"score": -1}},
-        {"$limit": 5}
+        {"$sort": {"score": -1, "username": 1}},
+        {"$limit": 3}
     ]
-    leaderboard = list(collection.aggregate(pipeline))
+    leaderboard_data = list(collection.aggregate(pipeline))
+    leaderboard = Leaderboard(
+        leaderboard=[LeaderboardEntry(**entry) for entry in leaderboard_data]
+    )
 
-    return {"leaderboard": leaderboard}
+    return leaderboard
 
 @app.post("/create-challenge")
 def create_challenge(challenge: ChallengeData, testing: bool = False, current_tutor: str = Depends(verify_tutor_token)):
