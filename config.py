@@ -3,7 +3,6 @@ from pymongo.collection import Collection
 from dotenv import load_dotenv
 import os
 from fastapi_mail import ConnectionConfig
-from datetime import timedelta
 
 load_dotenv()
 
